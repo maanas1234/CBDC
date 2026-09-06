@@ -20,7 +20,7 @@ standalone prototype — no shared code with the other tracks.
 | Correct temporal train/val/test split (no leakage) | ✅ Done |
 | ONNX export + full-model EZKL proving pipeline | ✅ Done |
 | Partial "disputed part" proving mechanism | ✅ Done (two variants tested) |
-| Benchmark partial vs. full proving | ✅ Done — **FAILS ≥10x target, ~2.9x best (honest negative result)** |
+| Benchmark partial vs. full proving | ✅ Done — **FAILS ≥10x target, ~2.9x best |
 
 ## Classifier results (Kaggle Elliptic dataset, temporal split)
 
