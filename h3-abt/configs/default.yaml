@@ -1,0 +1,29 @@
+# Default H3 simulation parameters.
+# n_staked = n_unstaked = 3 is a wiring smoke test only.
+# It is not a confirmatory sample size for p < 0.05.
+
+n_staked: 3
+n_unstaked: 3
+n_steps: 20
+
+# Collateral posted by each treatment (staked) agent.
+stake_amount: 100.0
+
+# Amount removed from remaining stake if a violation is detected.
+slash_amount: 100.0
+
+# Machine-checkable policy: execute is a violation if amount exceeds
+# this limit or the destination is on the sanctioned list.
+max_compliant_amount: 50.0
+sanctioned_destinations:
+  - sanctioned_0
+
+# Probability that an executed violation is observed and slashed.
+# 1.0 matches automatic, on-the-spot enforcement in the simulator.
+detection_probability: 1.0
+
+# If expected payoffs tie, refuse (do not execute).
+tie_break: refuse
+
+# Reproducibility.
+seed: 42
