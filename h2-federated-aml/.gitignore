@@ -1,0 +1,6 @@
+.venv/
+__pycache__/
+*.py[cod]
+data/elliptic1/*.csv
+data/elliptic1/processed/
+results/*.pt
