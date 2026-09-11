@@ -27,9 +27,10 @@ class TieBreak(str, Enum):
 
 @dataclass(frozen=True)
 class SimulationConfig:
-    """Configurable knobs for a later multi-agent run.
+    """Configurable knobs for the simulation.
 
-    This PR loads and validates the config. It does not run an experiment.
+    `n_staked` is reserved for a later treatment run. The unstaked
+    baseline ignores it and instantiates only `n_unstaked` agents.
     """
 
     n_staked: int
@@ -42,6 +43,14 @@ class SimulationConfig:
     detection_probability: float
     tie_break: TieBreak
     seed: int
+    p_over_limit: float
+    p_sanctioned: float
+    over_limit_extra: float
+    n_clean_destinations: int
+    compliant_payoff_min: float
+    compliant_payoff_max: float
+    violation_payoff_min: float
+    violation_payoff_max: float
 
 
 @dataclass(frozen=True)
@@ -80,3 +89,40 @@ class AgentState:
     agent_id: str
     is_staked: bool
     stake_remaining: float
+
+
+@dataclass(frozen=True)
+class StepRecord:
+    """One agent decision in one round.
+
+    `is_violation` is whether the chosen action *committed* a policy
+    violation (EXECUTE on a policy-violating transfer). Refusing a
+    violating offer is not a violation.
+    """
+
+    seed: int
+    step: int
+    agent_id: str
+    is_staked: bool
+    amount: float
+    destination: str
+    offer_is_policy_violation: bool
+    compliant_payoff: float
+    violation_payoff: float
+    detection_probability: float
+    action: Action
+    is_violation: bool
+
+
+@dataclass(frozen=True)
+class BaselineResult:
+    """Outcome of the unstaked control/baseline run. Not an H3 pass/fail."""
+
+    label: str
+    n_agents: int
+    n_steps: int
+    seed: int
+    total_actions: int
+    total_violations: int
+    violation_rate: float
+    records: tuple[StepRecord, ...]

@@ -26,6 +26,14 @@ def test_default_config_loads() -> None:
     assert config.detection_probability == 1.0
     assert config.tie_break is TieBreak.REFUSE
     assert config.seed == 42
+    assert config.p_over_limit == 0.5
+    assert config.p_sanctioned == 0.2
+    assert config.over_limit_extra == 50.0
+    assert config.n_clean_destinations == 5
+    assert config.compliant_payoff_min == 1.0
+    assert config.compliant_payoff_max == 10.0
+    assert config.violation_payoff_min == 1.0
+    assert config.violation_payoff_max == 30.0
 
 
 def test_load_config_uses_package_default_when_path_omitted() -> None:
@@ -86,4 +94,23 @@ def test_invalid_tie_break() -> None:
         "seed": 0,
     }
     with pytest.raises(ConfigError, match="tie_break"):
+        parse_config(raw)
+
+
+def test_payoff_range_must_be_ordered() -> None:
+    raw = {
+        "n_staked": 1,
+        "n_unstaked": 1,
+        "n_steps": 1,
+        "stake_amount": 1.0,
+        "slash_amount": 1.0,
+        "max_compliant_amount": 1.0,
+        "sanctioned_destinations": [],
+        "detection_probability": 1.0,
+        "tie_break": "refuse",
+        "seed": 0,
+        "compliant_payoff_min": 5.0,
+        "compliant_payoff_max": 1.0,
+    }
+    with pytest.raises(ConfigError, match="compliant_payoff_min"):
         parse_config(raw)
