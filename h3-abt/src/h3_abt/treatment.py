@@ -14,6 +14,7 @@ from random import Random
 
 from h3_abt.abt import ABTRegistry
 from h3_abt.environment import iter_agent_opportunities
+from h3_abt.metrics import violation_rate
 from h3_abt.protocol import choose_action, is_violation
 from h3_abt.types import (
     Action,
@@ -27,12 +28,6 @@ STAKED_TREATMENT_LABEL = "STAKED TREATMENT"
 # Separate from the opportunity seed so slashing draws cannot change
 # the environment stream used by the unstaked baseline.
 ENFORCEMENT_SEED_OFFSET = 1_000_003
-
-
-def _violation_rate(total_violations: int, total_actions: int) -> float:
-    if total_actions == 0:
-        return 0.0
-    return total_violations / total_actions
 
 
 def run_staked_treatment(config: SimulationConfig) -> TreatmentResult:
@@ -105,6 +100,6 @@ def run_staked_treatment(config: SimulationConfig) -> TreatmentResult:
         total_actions=total_actions,
         total_violations=total_violations,
         total_slashed=total_slashed,
-        violation_rate=_violation_rate(total_violations, total_actions),
+        violation_rate=violation_rate(total_violations, total_actions),
         records=tuple(records),
     )

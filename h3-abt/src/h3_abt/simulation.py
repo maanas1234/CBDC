@@ -11,6 +11,7 @@ from __future__ import annotations
 from random import Random
 
 from h3_abt.environment import iter_agent_opportunities
+from h3_abt.metrics import violation_rate
 from h3_abt.protocol import choose_action, is_violation, make_unstaked_agent
 from h3_abt.types import (
     Action,
@@ -20,12 +21,6 @@ from h3_abt.types import (
 )
 
 UNSTAKED_BASELINE_LABEL = "UNSTAKED CONTROL/BASELINE"
-
-
-def _violation_rate(total_violations: int, total_actions: int) -> float:
-    if total_actions == 0:
-        return 0.0
-    return total_violations / total_actions
 
 
 def run_unstaked_baseline(config: SimulationConfig) -> BaselineResult:
@@ -79,6 +74,6 @@ def run_unstaked_baseline(config: SimulationConfig) -> BaselineResult:
         seed=config.seed,
         total_actions=total_actions,
         total_violations=total_violations,
-        violation_rate=_violation_rate(total_violations, total_actions),
+        violation_rate=violation_rate(total_violations, total_actions),
         records=tuple(records),
     )

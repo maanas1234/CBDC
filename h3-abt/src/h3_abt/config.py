@@ -141,6 +141,12 @@ def parse_config(data: dict[str, Any]) -> SimulationConfig:
     except ValueError as exc:
         raise ConfigError("tie_break must be 'refuse' or 'execute'") from exc
 
+    raw_role = data.get("experiment_role", "smoke_test")
+    if raw_role not in {"smoke_test", "confirmatory"}:
+        raise ConfigError(
+            "experiment_role must be 'smoke_test' or 'confirmatory'"
+        )
+
     return SimulationConfig(
         n_staked=n_staked,
         n_unstaked=n_unstaked,
@@ -160,6 +166,7 @@ def parse_config(data: dict[str, Any]) -> SimulationConfig:
         compliant_payoff_max=compliant_payoff_max,
         violation_payoff_min=violation_payoff_min,
         violation_payoff_max=violation_payoff_max,
+        experiment_role=raw_role,
     )
 
 
