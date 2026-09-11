@@ -1,7 +1,7 @@
 [project]
 name = "h3-abt"
 version = "0.1.0"
-description = "H3 unstaked control/baseline simulation (no confirmatory results claimed)."
+description = "H3 unstaked baseline and staked treatment simulations (no confirmatory results claimed)."
 requires-python = ">=3.11"
 dependencies = [
     "pyyaml>=6.0",

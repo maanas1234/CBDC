@@ -30,7 +30,7 @@ seed: 42
 
 # Opportunity generator (environment). These probabilities draw *candidate
 # transfers*. They do not assign violations. A violation is recorded only
-# if an unstaked agent EXECUTES a policy-violating transfer via choose_action.
+# if an agent EXECUTES a policy-violating transfer via choose_action.
 p_over_limit: 0.5
 p_sanctioned: 0.2
 over_limit_extra: 50.0
