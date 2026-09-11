@@ -10,19 +10,19 @@
 
 **Second, separate pass/fail test:** Sybil resistance — can a slashed agent dodge its penalty by quitting and re-registering as a new identity? Reported as its own result, not blended into the above.
 
-**Status:** Experimental protocol and Python scaffold only. No multi-agent run, no statistical test, no on-chain contract, and **no experimental results**. Default `n_staked = n_unstaked = 3` is a wiring smoke-test size, not a confirmatory sample size for p < 0.05.
+**Status:** Unstaked control/baseline simulation is implemented. Staked treatment, statistical tests, on-chain ABT, and Sybil tests are **not** built. **No confirmatory H3 results.** Default `n_unstaked = 3`, `n_steps = 20` is a wiring smoke test, not a confirmatory sample size for p < 0.05.
 
 ## What goes here
 
-| Planned | This PR | Still missing |
+| Planned | Current | Still missing |
 |---|---|---|
-| Machine-checkable violation rule | Yes (`is_violation`) | Environment that offers transfers over time |
-| Incentive-responsive decision rule | Yes (`choose_action`) | Agents acting across many steps |
-| Treatment vs control as one flag | Yes (`is_staked`) | Group assignment in a run |
-| Configurable parameters + seed | Yes (`configs/default.yaml`) | Runner that consumes them |
+| Machine-checkable violation rule | Yes (`is_violation`) | — |
+| Incentive-responsive decision rule | Yes (`choose_action`) | — |
+| Treatment vs control as one flag | Flag exists; baseline uses unstaked only | Staked treatment run |
+| Configurable parameters + seed | Yes (`configs/default.yaml`) | — |
 | Stake / slash / non-transferable ABT | Slash term in expected payoff only | Token, staking, history, on-chain |
-| Multi-agent simulation | No | Next milestone |
-| Violation-rate + two-proportion test | No | Later |
+| Multi-agent simulation | **Unstaked control/baseline only** | Staked group in the same environment |
+| Violation-rate + two-proportion test | Counts and rate for unstaked only | Two-group comparison, z-test |
 | Sybil / identity-reset test | No | Later |
 
 ## Experimental protocol
@@ -78,20 +78,25 @@ Knobs live in `configs/default.yaml`:
 - `max_compliant_amount`, `sanctioned_destinations`
 - `detection_probability` (default `1.0` = automatic detection)
 - `tie_break`, `seed`
+- Opportunity generator: `p_over_limit`, `p_sanctioned`, `over_limit_extra`, `n_clean_destinations`, payoff ranges
+
+The generator draws candidate transfers and payoffs. It does **not** assign violations. The unstaked baseline ignores `n_staked`.
 
 Default `detection_probability: 1.0` matches automatic enforcement. A later robustness run may lower it; that value must be chosen before looking at results.
 
 `n_staked = n_unstaked = 3` is only a smoke-test default. A confirmatory comparison at p < 0.05 needs a larger pre-registered `n` (and/or more steps or independent runs). Do not treat a 3-vs-3 wiring run as the H3 result.
 
-### 5. Output schema (for the future runner)
+### 5. Output schema
 
-Not produced yet. The intended per-step record is:
+The unstaked baseline records, per step:
 
-- `seed`, `step`, `agent_id`, `is_staked`
-- `amount`, `destination`, `is_policy_violation`
-- `action`, `detected`, `slashed_amount`, `stake_remaining`
+- `seed`, `step`, `agent_id`, `is_staked` (always `false` in this run)
+- `amount`, `destination`, `offer_is_policy_violation`
+- `action`, `is_violation` (true only if the agent **executed** a policy-violating transfer)
 
-Aggregate later: per-agent and per-group violation rates; two-proportion z-test; majority-clean bar for staked agents; Sybil test as a **separate** table.
+Aggregates computed now: `total_actions`, `total_violations`, `violation_rate`.
+
+Not computed yet: two-proportion z-test, majority-clean bar for staked agents, Sybil test.
 
 ### 6. What would make this design invalid
 
@@ -105,13 +110,18 @@ Aggregate later: per-agent and per-group violation rates; two-proportion z-test;
 ```
 h3-abt/
   configs/default.yaml
+  run_baseline.py              # unstaked control/baseline CLI
   src/h3_abt/
-    config.py      # YAML load + validation
-    protocol.py    # violation check + expected-payoff choice
+    config.py                  # YAML load + validation
+    protocol.py                # violation check + expected-payoff choice
+    environment.py             # shared opportunity generator
+    simulation.py              # unstaked baseline runner
+    baseline.py                # CLI formatting
     types.py
   tests/
     test_config.py
     test_protocol.py
+    test_baseline.py
   requirements.txt
   pyproject.toml
 ```
@@ -125,8 +135,20 @@ python -m pip install -r requirements.txt
 python -m pytest
 ```
 
-Tests check config parsing and the protocol functions on **constructed** examples. They are not a multi-agent experiment and are not H3 pass/fail evidence.
+Tests check config parsing, protocol functions on constructed examples, and baseline wiring (reproducibility, unstaked-only agents, decision-rule reuse). They are not H3 pass/fail evidence.
+
+## How to run the unstaked control/baseline
+
+From `h3-abt/`:
+
+```bash
+python run_baseline.py
+python run_baseline.py --config configs/default.yaml
+python run_baseline.py --json
+```
+
+This uses `n_unstaked` and `n_steps` from the config. It **ignores** `n_staked`. Output is labeled **UNSTAKED CONTROL/BASELINE (SMOKE TEST)**. Those numbers are not a confirmatory experiment and must not be reported as H3 validation.
 
 ## Next milestone
 
-Unstaked baseline simulation: one agent type, no stake, logged actions over `n_steps`, same seed → same trace. No statistical claim.
+Staked treatment in the **same** environment, same `choose_action`, `is_staked=True` as the only group difference. No statistical claim in that PR unless explicitly scoped.
