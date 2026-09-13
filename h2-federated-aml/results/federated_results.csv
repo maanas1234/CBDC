@@ -1,0 +1,2 @@
+accuracy,precision,recall,f1,pr_auc,confusion_matrix,roc_auc,method,scarcity,seed,institutions,lambda,partition_method,experiment,degradation_f1
+0.7774119667907243,0.2720626631853786,0.7639296187683284,0.4012321909896034,0.3250569533430913,"[[4910, 1394], [161, 521]]",0.8429098687050628,fedavg,1.0,42,3,0.0,graph_aware,main_scarcity,0.0
