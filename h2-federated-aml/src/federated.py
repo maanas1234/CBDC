@@ -76,6 +76,6 @@ def run_local_only(data, splits, *, k=3, partition_method="graph_aware", seed=42
     initial_model = GCN(data.num_node_features, hidden_dim).to(dev); logits = torch.zeros((data.num_nodes, 2))
     for institution in institutions:
         state, _, _ = train_local(initial_model, data, institution, train_mask, dev, epochs, lr, 5e-4)
-        local_model = GCN(data.num_node_features, hidden_dim).to(dev); local_model.load_state_dict(state); local_model.eval()
+        local_model = GCN(data.num_node_features, hidden_dim, cached=True).to(dev); local_model.load_state_dict(state); local_model.eval()
         with torch.no_grad(): logits[institution.node_ids] = local_model(data.x[institution.node_ids].to(dev), institution.edge_index.to(dev)).cpu()
     return evaluate_logits(logits, data.y, splits["test"]), institutions, train_mask, scarcity_counts
