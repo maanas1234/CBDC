@@ -1,0 +1,69 @@
+{
+  "B60_u2": {
+    "verify_tx_gas": 645981,
+    "deploy_gas": 3943698,
+    "bytecode_kb": 17.5986328125,
+    "calldata_bytes": 4068,
+    "n_instances": 2,
+    "call_returns_true": true,
+    "tx_status": "0x1"
+  },
+  "B60_u61": {
+    "verify_tx_gas": 645492,
+    "deploy_gas": 3957194,
+    "bytecode_kb": 17.6591796875,
+    "calldata_bytes": 4068,
+    "n_instances": 2,
+    "call_returns_true": true,
+    "tx_status": "0x1"
+  },
+  "B60_mono": {
+    "verify_tx_gas": 696984,
+    "deploy_gas": 2956155,
+    "bytecode_kb": 13.1396484375,
+    "calldata_bytes": 8548,
+    "n_instances": 166,
+    "call_returns_true": true,
+    "tx_status": "0x1"
+  },
+  "B60_proj0": {
+    "verify_tx_gas": 1057745,
+    "deploy_gas": 5346074,
+    "bytecode_kb": 23.9296875,
+    "calldata_bytes": 11492,
+    "n_instances": 166,
+    "call_returns_true": true,
+    "tx_status": "0x1"
+  },
+  "B60_u1": {
+    "verify_tx_gas": 647260,
+    "deploy_gas": 3942942,
+    "bytecode_kb": 17.5947265625,
+    "calldata_bytes": 4100,
+    "n_instances": 3,
+    "call_returns_true": true,
+    "tx_status": "0x1"
+  },
+  "game_B60": {
+    "commit_first": 133767,
+    "commit_steady": 116667,
+    "commit_compact_first": 67062,
+    "commit_compact_steady": 49962,
+    "rounds": 5,
+    "reveal_gas": [
+      74965,
+      74967,
+      74957,
+      74959,
+      74937
+    ],
+    "respond_gas": [
+      27029,
+      27029,
+      27029,
+      27029,
+      22217
+    ],
+    "bisection_total": 505118
+  }
+}

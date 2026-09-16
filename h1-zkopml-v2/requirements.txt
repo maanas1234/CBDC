@@ -1,0 +1,9 @@
+ezkl==23.0.5
+onnx==1.22.0
+onnxruntime
+numpy==2.4.4
+pandas==3.0.2
+scikit-learn==1.8.0
+matplotlib
+pycryptodome
+# plus, for gas measurement: Foundry (anvil, cast) and solc 0.8.24 on PATH

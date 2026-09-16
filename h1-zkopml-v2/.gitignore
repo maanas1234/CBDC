@@ -1,0 +1,11 @@
+.venv/
+__pycache__/
+.DS_Store
+work/
+*.srs
+*.key
+*.compiled
+*.npy
+elliptic_bitcoin_dataset/
+*.csv
+.Rhistory
