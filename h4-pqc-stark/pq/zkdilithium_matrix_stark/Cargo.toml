@@ -1,0 +1,7 @@
+[package]
+name = "zkdilithium_matrix_stark"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+winterfell = { git = "https://github.com/bwesterb/winterfell", branch = "f23" }
