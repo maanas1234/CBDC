@@ -29,8 +29,8 @@ class TieBreak(str, Enum):
 class SimulationConfig:
     """Configurable knobs for the simulation.
 
-    `n_staked` is reserved for a later treatment run. The unstaked
-    baseline ignores it and instantiates only `n_unstaked` agents.
+    The unstaked baseline uses `n_unstaked` and ignores `n_staked`.
+    The staked treatment uses `n_staked` and ignores `n_unstaked`.
     """
 
     n_staked: int
@@ -112,6 +112,11 @@ class StepRecord:
     detection_probability: float
     action: Action
     is_violation: bool
+    abt_id: str | None = None
+    detected: bool = False
+    slashed_amount: float = 0.0
+    stake_before: float = 0.0
+    stake_remaining: float = 0.0
 
 
 @dataclass(frozen=True)
@@ -124,5 +129,41 @@ class BaselineResult:
     seed: int
     total_actions: int
     total_violations: int
+    violation_rate: float
+    records: tuple[StepRecord, ...]
+
+
+@dataclass(frozen=True)
+class AgentBoundToken:
+    """Non-transferable identity credential bound to one agent."""
+
+    token_id: str
+    owner_id: str
+
+
+@dataclass(frozen=True)
+class ViolationEvent:
+    """One recorded, verified policy violation on an ABT identity."""
+
+    step: int
+    agent_id: str
+    token_id: str
+    amount: float
+    destination: str
+    slashed_amount: float
+    stake_remaining: float
+
+
+@dataclass(frozen=True)
+class TreatmentResult:
+    """Outcome of the staked treatment run. Not an H3 pass/fail."""
+
+    label: str
+    n_agents: int
+    n_steps: int
+    seed: int
+    total_actions: int
+    total_violations: int
+    total_slashed: float
     violation_rate: float
     records: tuple[StepRecord, ...]

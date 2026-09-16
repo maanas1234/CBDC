@@ -10,7 +10,7 @@ from __future__ import annotations
 
 from random import Random
 
-from h3_abt.environment import sample_opportunity
+from h3_abt.environment import iter_agent_opportunities
 from h3_abt.protocol import choose_action, is_violation, make_unstaked_agent
 from h3_abt.types import (
     Action,
@@ -41,28 +41,34 @@ def run_unstaked_baseline(config: SimulationConfig) -> BaselineResult:
     ]
     records: list[StepRecord] = []
 
-    for step in range(1, config.n_steps + 1):
-        for agent in agents:
-            opportunity = sample_opportunity(rng, config)
-            action = choose_action(opportunity, agent, config)
-            offer_violates = is_violation(opportunity.transfer, config)
-            committed = action is Action.EXECUTE and offer_violates
-            records.append(
-                StepRecord(
-                    seed=config.seed,
-                    step=step,
-                    agent_id=agent.agent_id,
-                    is_staked=agent.is_staked,
-                    amount=opportunity.transfer.amount,
-                    destination=opportunity.transfer.destination,
-                    offer_is_policy_violation=offer_violates,
-                    compliant_payoff=opportunity.compliant_payoff,
-                    violation_payoff=opportunity.violation_payoff,
-                    detection_probability=opportunity.detection_probability,
-                    action=action,
-                    is_violation=committed,
-                )
+    for step, agent_index, opportunity in iter_agent_opportunities(
+        config, len(agents), rng
+    ):
+        agent = agents[agent_index]
+        action = choose_action(opportunity, agent, config)
+        offer_violates = is_violation(opportunity.transfer, config)
+        committed = action is Action.EXECUTE and offer_violates
+        records.append(
+            StepRecord(
+                seed=config.seed,
+                step=step,
+                agent_id=agent.agent_id,
+                is_staked=agent.is_staked,
+                amount=opportunity.transfer.amount,
+                destination=opportunity.transfer.destination,
+                offer_is_policy_violation=offer_violates,
+                compliant_payoff=opportunity.compliant_payoff,
+                violation_payoff=opportunity.violation_payoff,
+                detection_probability=opportunity.detection_probability,
+                action=action,
+                is_violation=committed,
+                abt_id=None,
+                detected=False,
+                slashed_amount=0.0,
+                stake_before=0.0,
+                stake_remaining=0.0,
             )
+        )
 
     total_actions = len(records)
     total_violations = sum(1 for record in records if record.is_violation)
