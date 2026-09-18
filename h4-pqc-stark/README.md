@@ -20,7 +20,6 @@ h4-pqc-stark/
 │   └── matched_matrix_stark/
 ├── pq/
 │   ├── matched_matrix_stark/
-│   └── zkdilithium_matrix_stark/
 ├── experiments/
 │   └── benchmark_results.csv
 ├── docs/
