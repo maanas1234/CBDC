@@ -4,3 +4,6 @@ __pycache__/
 .venv/
 venv/
 *.egg-info/
+results/*.json
+results/*.csv
+

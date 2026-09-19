@@ -31,6 +31,8 @@ class SimulationConfig:
 
     The unstaked baseline uses `n_unstaked` and ignores `n_staked`.
     The staked treatment uses `n_staked` and ignores `n_unstaked`.
+    `experiment_role` is `smoke_test` or `confirmatory`. Smoke-test
+    numbers are never confirmatory H3 evidence.
     """
 
     n_staked: int
@@ -51,6 +53,7 @@ class SimulationConfig:
     compliant_payoff_max: float
     violation_payoff_min: float
     violation_payoff_max: float
+    experiment_role: str
 
 
 @dataclass(frozen=True)
@@ -167,3 +170,60 @@ class TreatmentResult:
     total_slashed: float
     violation_rate: float
     records: tuple[StepRecord, ...]
+
+
+@dataclass(frozen=True)
+class ExperimentObservation:
+    """One exported comparison row. Violations are committed actions only."""
+
+    group: str
+    agent_id: str
+    step: int
+    action: str
+    is_violation: bool
+    stake_before: float
+    stake_after: float
+    amount_slashed: float
+
+
+@dataclass(frozen=True)
+class GroupCounts:
+    group: str
+    n_agents: int
+    total_actions: int
+    total_violations: int
+    violation_rate: float
+
+
+@dataclass(frozen=True)
+class TwoProportionZTest:
+    """One-sided two-proportion z-test, H1: p_treatment < p_control."""
+
+    z_statistic: float | None
+    p_value: float | None
+    standard_error: float | None
+    pooled_proportion: float | None
+    alpha: float
+    defined: bool
+    note: str
+
+
+@dataclass(frozen=True)
+class ExperimentResult:
+    """Control vs treatment comparison. Not an H3 proof."""
+
+    label: str
+    experiment_role: str
+    seed: int
+    n_steps: int
+    alpha: float
+    control: GroupCounts
+    treatment: GroupCounts
+    absolute_difference: float
+    relative_reduction: float | None
+    z_test: TwoProportionZTest
+    treatment_rate_lower: bool
+    statistically_significant_lower: bool
+    verdict: str
+    treatment_violation_feasible: bool
+    observations: tuple[ExperimentObservation, ...]

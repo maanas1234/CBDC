@@ -10,7 +10,7 @@
 
 **Second, separate pass/fail test:** Sybil resistance — can a slashed agent dodge its penalty by quitting and re-registering as a new identity? Reported as its own result, not blended into the above.
 
-**Status:** Unstaked control/baseline and staked treatment (ABT + automatic slashing) are implemented. Two-group statistical comparison, p-values, on-chain Solidity, and Sybil tests are **not** built. **No confirmatory H3 results.** Default `n=3`, `n_steps=20` is a wiring smoke test, not a confirmatory sample size for p < 0.05.
+**Status:** Control vs treatment comparison and one-sided two-proportion z-test are implemented. Sybil testing and on-chain Solidity are **not** built. **H3 is not proven.** Smoke-test `n=3` is not a confirmatory sample. A separate confirmatory config exists in `configs/experiment.yaml`; running it is not a license to retune parameters for a p-value.
 
 ## What goes here
 
@@ -18,11 +18,11 @@
 |---|---|---|
 | Machine-checkable violation rule | Yes (`is_violation`) | — |
 | Incentive-responsive decision rule | Yes (`choose_action`) | — |
-| Treatment vs control as one flag | Yes (`is_staked`) | Joint comparison runner |
-| Configurable parameters + seed | Yes (`configs/default.yaml`) | — |
+| Treatment vs control as one flag | Yes (`is_staked`) | — |
+| Configurable parameters + seed | Yes (smoke + confirmatory YAML) | — |
 | Stake / slash / non-transferable ABT | Yes (in-sim registry; not Solidity) | On-chain contract (optional later) |
-| Multi-agent simulation | Unstaked baseline **and** staked treatment | Combined experiment |
-| Violation-rate + two-proportion test | Counts/rate per group separately | Two-group z-test, p < 0.05 |
+| Multi-agent simulation | Unstaked **and** staked | — |
+| Violation-rate + two-proportion test | Yes (one-sided z-test, alpha=0.05) | Majority-clean bar still separate |
 | Sybil / identity-reset test | No | Later |
 
 ## Experimental protocol
@@ -99,7 +99,21 @@ Control fills ABT/slash fields with empty/zero. Treatment fills them from the re
 
 Aggregates: `total_actions`, `total_violations`, `violation_rate`. Treatment also reports `total_slashed`.
 
-Not computed: two-proportion z-test, majority-clean bar, Sybil test.
+The comparison runner also reports absolute difference, relative reduction when defined, one-sided two-proportion z-statistic, p-value, alpha=0.05, and verdict.
+
+**Verdict rule (this experiment only):**
+
+- `SUPPORTED` only if treatment violation rate < control violation rate **and** p < 0.05.
+- Otherwise `NOT SUPPORTED BY THIS EXPERIMENT`.
+- `SUPPORTED` means that predefined criterion was met **under the specified configuration**. It does not mean H3 has been universally proven.
+
+Very small p-values are computed with `erfc` (not `1 + erf`) and printed in scientific notation. They are not displayed as `0.000000`.
+
+Smoke-test configs (`experiment_role: smoke_test`) must not be reported as confirmatory evidence. Use `configs/experiment.yaml` for the confirmatory configuration. That file documents a priori parameter choices. Do not edit it to chase a p-value. The H3 source does not specify a minimum effect size; none is invented.
+
+The PR 3 smoke slash of 100 sits above the default violation_payoff range [1, 30], so staked agents never find a violating offer worth taking. The confirmatory `slash_amount: 15` is inside that range so both REFUSE (slash dominates) and EXECUTE (gain dominates) remain possible. That is a parameter-box choice, not a result.
+
+Not computed: majority-clean bar, Sybil test.
 
 ### 6. ABT registry (protocol, not the experiment)
 
@@ -126,24 +140,28 @@ Passing registry tests means the **mechanism** is correct. It does **not** mean 
 
 ```
 h3-abt/
-  configs/default.yaml
-  run_baseline.py              # unstaked control/baseline CLI
-  run_treatment.py             # staked treatment CLI
+  configs/default.yaml         # smoke test
+  configs/experiment.yaml      # confirmatory config (a priori)
+  run_baseline.py
+  run_treatment.py
+  run_experiment.py            # control vs treatment + z-test
+  results/                     # JSON/CSV output (generated)
   src/h3_abt/
-    config.py
-    protocol.py                # violation check + expected-payoff choice
-    environment.py             # shared opportunity generator
-    abt.py                     # ABT registry: identity, stake, slash, history
-    simulation.py              # unstaked baseline runner
-    treatment.py               # staked treatment runner
-    baseline.py / treatment_cli.py
-    types.py
+    protocol.py
+    environment.py
+    abt.py
+    simulation.py / treatment.py
+    experiment.py / stats.py / metrics.py
+    ...
   tests/
     test_config.py
     test_protocol.py
     test_baseline.py
-    test_abt.py                # protocol/mechanism correctness
-    test_treatment.py          # staked runner wiring
+    test_abt.py
+    test_treatment.py
+    test_metrics.py
+    test_stats.py
+    test_experiment.py
 ```
 
 ## How to run tests
@@ -181,6 +199,21 @@ python run_treatment.py --json
 
 This uses `n_staked` and `n_steps`. It **ignores** `n_unstaked`. Output is labeled **STAKED TREATMENT (SMOKE TEST)**. Those numbers are wiring output only: not a control comparison, not a p-value, and not H3 validation.
 
+## How to run the control vs treatment comparison
+
+From `h3-abt/`:
+
+```bash
+python run_experiment.py
+python run_experiment.py --config configs/default.yaml --no-save
+python run_experiment.py --config configs/experiment.yaml
+```
+
+- `configs/default.yaml` is a **SMOKE TEST** (`n=3`, `slash_amount=100`).
+- `configs/experiment.yaml` is the **confirmatory configuration** (a priori; do not retune for p-values).
+
+Output includes rates, z, p (scientific notation when small), alpha=0.05, and `SUPPORTED` / `NOT SUPPORTED BY THIS EXPERIMENT`. `SUPPORTED` is the predefined rule under that config, not a universal proof of H3. JSON and CSV go to `results/` unless `--no-save` is set.
+
 ## Next milestone
 
-Same-environment treatment-vs-control comparison harness (still no p-value unless explicitly scoped). Sybil/identity-reset remains a later, separate test.
+Sybil / identity-reset test, reported separately from the main treatment/control table.
