@@ -167,3 +167,37 @@ class TreatmentResult:
     total_slashed: float
     violation_rate: float
     records: tuple[StepRecord, ...]
+
+
+class SybilOutcome(str, Enum):
+    """Result of the identity-reset test. Separate from the H3 z-test."""
+
+    SYBIL_BLOCKED = "SYBIL_BLOCKED"
+    SYBIL_SUCCEEDED = "SYBIL_SUCCEEDED"
+    NOT_ENFORCED = "NOT_ENFORCED"
+
+
+@dataclass(frozen=True)
+class SybilResult:
+    """Identity-reset probe of the in-sim ABT registry. Not an H3 proof."""
+
+    label: str
+    seed: int
+    original_identity: str
+    original_abt_id: str
+    original_stake_before: float
+    slash_amount: float
+    original_stake_after: float
+    original_violation_count: int
+    original_history: tuple[ViolationEvent, ...]
+    new_identity: str
+    new_registration_succeeded: bool
+    fresh_abt_obtained: bool
+    new_abt_id: str | None
+    fresh_stake_obtained: bool
+    new_stake: float
+    new_violation_count: int
+    previous_liability_bypassed: bool
+    logical_agent_binding_exists: bool
+    outcome: SybilOutcome
+    interpretation: str
