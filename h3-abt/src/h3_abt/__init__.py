@@ -22,6 +22,8 @@ from h3_abt.protocol import (
     make_unstaked_agent,
 )
 from h3_abt.simulation import UNSTAKED_BASELINE_LABEL, run_unstaked_baseline
+from h3_abt.sybil import run_sybil_identity_reset
+from h3_abt.sybil_cli import format_sybil_report, main as sybil_main
 from h3_abt.treatment import STAKED_TREATMENT_LABEL, run_staked_treatment
 from h3_abt.treatment_cli import (
     format_treatment_report,
@@ -35,6 +37,8 @@ from h3_abt.types import (
     Opportunity,
     SimulationConfig,
     StepRecord,
+    SybilOutcome,
+    SybilResult,
     TieBreak,
     Transfer,
     TreatmentResult,
@@ -55,6 +59,8 @@ __all__ = [
     "SimulationConfig",
     "STAKED_TREATMENT_LABEL",
     "StepRecord",
+    "SybilOutcome",
+    "SybilResult",
     "TieBreak",
     "Transfer",
     "TreatmentResult",
@@ -66,6 +72,7 @@ __all__ = [
     "expected_payoff_refuse",
     "expected_slash",
     "format_baseline_report",
+    "format_sybil_report",
     "format_treatment_report",
     "is_violation",
     "iter_agent_opportunities",
@@ -74,7 +81,9 @@ __all__ = [
     "make_unstaked_agent",
     "parse_config",
     "run_staked_treatment",
+    "run_sybil_identity_reset",
     "run_unstaked_baseline",
     "sample_opportunity",
+    "sybil_main",
     "treatment_main",
 ]

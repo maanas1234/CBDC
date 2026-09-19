@@ -10,7 +10,7 @@
 
 **Second, separate pass/fail test:** Sybil resistance — can a slashed agent dodge its penalty by quitting and re-registering as a new identity? Reported as its own result, not blended into the above.
 
-**Status:** Unstaked control/baseline and staked treatment (ABT + automatic slashing) are implemented. Two-group statistical comparison, p-values, on-chain Solidity, and Sybil tests are **not** built. **No confirmatory H3 results.** Default `n=3`, `n_steps=20` is a wiring smoke test, not a confirmatory sample size for p < 0.05.
+**Status:** Unstaked control/baseline and staked treatment (ABT + automatic slashing) are implemented. The Sybil / identity-reset probe of the in-sim registry is implemented as a **separate** result. Two-group statistical comparison, p-values, and on-chain Solidity are **not** on this branch. **No confirmatory H3 results** and **no claim of Sybil resistance.** Default `n=3`, `n_steps=20` is a wiring smoke test, not a confirmatory sample size for p < 0.05.
 
 ## What goes here
 
@@ -23,7 +23,7 @@
 | Stake / slash / non-transferable ABT | Yes (in-sim registry; not Solidity) | On-chain contract (optional later) |
 | Multi-agent simulation | Unstaked baseline **and** staked treatment | Combined experiment |
 | Violation-rate + two-proportion test | Counts/rate per group separately | Two-group z-test, p < 0.05 |
-| Sybil / identity-reset test | No | Later |
+| Sybil / identity-reset test | Yes (separate from any z-test) | Logical-agent / real-world binding (not invented here) |
 
 ## Experimental protocol
 
@@ -99,7 +99,7 @@ Control fills ABT/slash fields with empty/zero. Treatment fills them from the re
 
 Aggregates: `total_actions`, `total_violations`, `violation_rate`. Treatment also reports `total_slashed`.
 
-Not computed: two-proportion z-test, majority-clean bar, Sybil test.
+Not computed here: two-proportion z-test, majority-clean bar. The Sybil probe is a **separate** runner (`run_sybil.py`) and is not folded into these aggregates.
 
 ### 6. ABT registry (protocol, not the experiment)
 
@@ -114,6 +114,8 @@ Automatic slashing in the treatment runner means: if the agent **executes** a po
 
 Passing registry tests means the **mechanism** is correct. It does **not** mean staking reduced violations in a confirmatory experiment.
 
+The registry keys accounts by `agent_id` string only. Re-registering the **same** string is rejected. Transferring an existing ABT is rejected. A **new** string is a new account: new ABT, independent stake, empty history. There is no logical-operator, hardware, or real-world identity link. That is the mechanism the Sybil test measures. Do not invent an on-chain KYC graph that is not implemented.
+
 ### 7. What would make this design invalid
 
 - Hard-coding a violation coin-flip that does not use `expected_slash`
@@ -122,6 +124,32 @@ Passing registry tests means the **mechanism** is correct. It does **not** mean 
 - Calling the smoke-test `n=3` a confirmatory result
 - Mixing the Sybil test into the main treatment/control table
 
+### 8. Sybil / identity-reset test (separate evaluation)
+
+This is **not** part of the treatment-vs-control comparison and does **not** change any H3 statistical verdict.
+
+The probe uses the registry as implemented:
+
+1. Register `logical_agent_0` and post the configured stake / ABT.
+2. Commit a machine-checkable violation (`amount > max_compliant_amount`).
+3. Apply `report_violation` (the existing automatic slash).
+4. Record original identity, remaining stake, ABT id, and violation history.
+5. Attempt an identity reset: register a new string `logical_agent_0_reset` for the same logical agent.
+6. Attempt to obtain a new ABT and the configured stake under that new string.
+7. Ask whether previous liability/history follows the new identity.
+
+Possible outcomes:
+
+| Outcome | Meaning |
+|---|---|
+| `SYBIL_BLOCKED` | The mechanism prevents the penalized logical agent from escaping prior liability/history. |
+| `SYBIL_SUCCEEDED` | A fresh identity can obtain a new ABT/stake and empty history; prior liability stays on the old id only. |
+| `NOT_ENFORCED` | The simulation cannot establish Sybil resistance or success because linkage is too thin to judge. |
+
+**Measured result of the implemented registry:** `SYBIL_SUCCEEDED`. Non-transferability stops moving the old ABT, but a new `agent_id` is unconstrained. This is not Sybil resistance. It is also not a claim that H3 is proven or disproven.
+
+Reproducibility: the scenario is fully determined by the config (`seed` is recorded; the violating transfer is constructed, not sampled). Default config uses `seed: 42`.
+
 ## Layout
 
 ```
@@ -129,6 +157,7 @@ h3-abt/
   configs/default.yaml
   run_baseline.py              # unstaked control/baseline CLI
   run_treatment.py             # staked treatment CLI
+  run_sybil.py                 # identity-reset probe (separate from z-test)
   src/h3_abt/
     config.py
     protocol.py                # violation check + expected-payoff choice
@@ -136,6 +165,7 @@ h3-abt/
     abt.py                     # ABT registry: identity, stake, slash, history
     simulation.py              # unstaked baseline runner
     treatment.py               # staked treatment runner
+    sybil.py / sybil_cli.py    # Sybil/identity-reset probe
     baseline.py / treatment_cli.py
     types.py
   tests/
@@ -144,6 +174,7 @@ h3-abt/
     test_baseline.py
     test_abt.py                # protocol/mechanism correctness
     test_treatment.py          # staked runner wiring
+    test_sybil.py              # identity-reset probe
 ```
 
 ## How to run tests
@@ -181,6 +212,18 @@ python run_treatment.py --json
 
 This uses `n_staked` and `n_steps`. It **ignores** `n_unstaked`. Output is labeled **STAKED TREATMENT (SMOKE TEST)**. Those numbers are wiring output only: not a control comparison, not a p-value, and not H3 validation.
 
+## How to run the Sybil / identity-reset test
+
+From `h3-abt/`:
+
+```bash
+python run_sybil.py
+python run_sybil.py --config configs/default.yaml
+python run_sybil.py --json
+```
+
+Output reports original/new identities, slash, remaining stake, history, whether a fresh ABT/stake was obtained, whether prior liability was bypassed, and `outcome`. This result must **not** be blended into a treatment/control table or used to change an H3 z-test verdict. The current implementation outcome is `SYBIL_SUCCEEDED`.
+
 ## Next milestone
 
-Same-environment treatment-vs-control comparison harness (still no p-value unless explicitly scoped). Sybil/identity-reset remains a later, separate test.
+Same-environment treatment-vs-control comparison harness (still no p-value unless explicitly scoped). The Sybil probe is already a separate runner and must stay separate from that comparison.
