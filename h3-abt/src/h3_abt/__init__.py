@@ -29,6 +29,8 @@ from h3_abt.protocol import (
 )
 from h3_abt.simulation import UNSTAKED_BASELINE_LABEL, run_unstaked_baseline
 from h3_abt.stats import two_proportion_z_test
+from h3_abt.sybil import run_sybil_identity_reset
+from h3_abt.sybil_cli import format_sybil_report, main as sybil_main
 from h3_abt.treatment import STAKED_TREATMENT_LABEL, run_staked_treatment
 from h3_abt.treatment_cli import (
     format_treatment_report,
@@ -43,6 +45,8 @@ from h3_abt.types import (
     Opportunity,
     SimulationConfig,
     StepRecord,
+    SybilOutcome,
+    SybilResult,
     TieBreak,
     Transfer,
     TreatmentResult,
@@ -64,6 +68,8 @@ __all__ = [
     "SimulationConfig",
     "STAKED_TREATMENT_LABEL",
     "StepRecord",
+    "SybilOutcome",
+    "SybilResult",
     "TieBreak",
     "Transfer",
     "TreatmentResult",
@@ -77,6 +83,7 @@ __all__ = [
     "experiment_main",
     "format_baseline_report",
     "format_experiment_report",
+    "format_sybil_report",
     "format_treatment_report",
     "is_violation",
     "iter_agent_opportunities",
@@ -86,9 +93,11 @@ __all__ = [
     "parse_config",
     "run_comparison",
     "run_staked_treatment",
+    "run_sybil_identity_reset",
     "run_unstaked_baseline",
     "sample_opportunity",
     "save_results",
+    "sybil_main",
     "treatment_main",
     "two_proportion_z_test",
     "violation_rate",

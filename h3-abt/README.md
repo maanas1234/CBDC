@@ -10,7 +10,7 @@
 
 **Second, separate pass/fail test:** Sybil resistance — can a slashed agent dodge its penalty by quitting and re-registering as a new identity? Reported as its own result, not blended into the above.
 
-**Status:** Control vs treatment comparison and one-sided two-proportion z-test are implemented. Sybil testing and on-chain Solidity are **not** built. **H3 is not proven.** Smoke-test `n=3` is not a confirmatory sample. A separate confirmatory config exists in `configs/experiment.yaml`; running it is not a license to retune parameters for a p-value.
+**Status:** Control vs treatment comparison and one-sided two-proportion z-test are implemented. The Sybil / identity-reset probe of the in-sim registry is implemented as a **separate** result. On-chain Solidity is **not** built. **H3 is not proven.** There is **no claim of Sybil resistance.** Smoke-test `n=3` is not a confirmatory sample. A separate confirmatory config exists in `configs/experiment.yaml`; running it is not a license to retune parameters for a p-value.
 
 ## What goes here
 
@@ -23,7 +23,7 @@
 | Stake / slash / non-transferable ABT | Yes (in-sim registry; not Solidity) | On-chain contract (optional later) |
 | Multi-agent simulation | Unstaked **and** staked | — |
 | Violation-rate + two-proportion test | Yes (one-sided z-test, alpha=0.05) | Majority-clean bar still separate |
-| Sybil / identity-reset test | No | Later |
+| Sybil / identity-reset test | Yes (separate from any z-test) | Logical-agent / real-world binding (not invented here) |
 
 ## Experimental protocol
 
@@ -113,7 +113,7 @@ Smoke-test configs (`experiment_role: smoke_test`) must not be reported as confi
 
 The PR 3 smoke slash of 100 sits above the default violation_payoff range [1, 30], so staked agents never find a violating offer worth taking. The confirmatory `slash_amount: 15` is inside that range so both REFUSE (slash dominates) and EXECUTE (gain dominates) remain possible. That is a parameter-box choice, not a result.
 
-Not computed: majority-clean bar, Sybil test.
+Not computed: majority-clean bar. The Sybil probe is a **separate** runner (`run_sybil.py`) and is not folded into these aggregates.
 
 ### 6. ABT registry (protocol, not the experiment)
 
@@ -128,6 +128,8 @@ Automatic slashing in the treatment runner means: if the agent **executes** a po
 
 Passing registry tests means the **mechanism** is correct. It does **not** mean staking reduced violations in a confirmatory experiment.
 
+The registry keys accounts by `agent_id` string only. Re-registering the **same** string is rejected. Transferring an existing ABT is rejected. A **new** string is a new account: new ABT, independent stake, empty history. There is no logical-operator, hardware, or real-world identity link. That is the mechanism the Sybil test measures. Do not invent an on-chain KYC graph that is not implemented.
+
 ### 7. What would make this design invalid
 
 - Hard-coding a violation coin-flip that does not use `expected_slash`
@@ -135,6 +137,32 @@ Passing registry tests means the **mechanism** is correct. It does **not** mean 
 - Mixing detection draws into the opportunity RNG (that would make treatment and control see different environments)
 - Calling the smoke-test `n=3` a confirmatory result
 - Mixing the Sybil test into the main treatment/control table
+
+### 8. Sybil / identity-reset test (separate evaluation)
+
+This is **not** part of the treatment-vs-control comparison and does **not** change any H3 statistical verdict.
+
+The probe uses the registry as implemented:
+
+1. Register `logical_agent_0` and post the configured stake / ABT.
+2. Commit a machine-checkable violation (`amount > max_compliant_amount`).
+3. Apply `report_violation` (the existing automatic slash).
+4. Record original identity, remaining stake, ABT id, and violation history.
+5. Attempt an identity reset: register a new string `logical_agent_0_reset` for the same logical agent.
+6. Attempt to obtain a new ABT and the configured stake under that new string.
+7. Ask whether previous liability/history follows the new identity.
+
+Possible outcomes:
+
+| Outcome | Meaning |
+|---|---|
+| `SYBIL_BLOCKED` | The mechanism prevents the penalized logical agent from escaping prior liability/history. |
+| `SYBIL_SUCCEEDED` | A fresh identity can obtain a new ABT/stake and empty history; prior liability stays on the old id only. |
+| `NOT_ENFORCED` | The simulation cannot establish Sybil resistance or success because linkage is too thin to judge. |
+
+**Measured result of the implemented registry:** `SYBIL_SUCCEEDED`. The current prototype keys identity by `agent_id`, so a fresh identity can register again with fresh stake/history. Non-transferability stops moving the old ABT, but a new `agent_id` is unconstrained. This is not Sybil resistance. It is also not a claim that H3 is proven or disproven.
+
+Reproducibility: the scenario is fully determined by the config (`seed` is recorded; the violating transfer is constructed, not sampled). Default config uses `seed: 42`.
 
 ## Layout
 
@@ -145,23 +173,29 @@ h3-abt/
   run_baseline.py
   run_treatment.py
   run_experiment.py            # control vs treatment + z-test
+  run_sybil.py                 # identity-reset probe (separate from z-test)
   results/                     # JSON/CSV output (generated)
   src/h3_abt/
-    protocol.py
-    environment.py
-    abt.py
-    simulation.py / treatment.py
+    config.py
+    protocol.py                # violation check + expected-payoff choice
+    environment.py             # shared opportunity generator
+    abt.py                     # ABT registry: identity, stake, slash, history
+    simulation.py              # unstaked baseline runner
+    treatment.py               # staked treatment runner
     experiment.py / stats.py / metrics.py
-    ...
+    sybil.py / sybil_cli.py    # Sybil/identity-reset probe
+    baseline.py / treatment_cli.py / experiment_cli.py
+    types.py
   tests/
     test_config.py
     test_protocol.py
     test_baseline.py
-    test_abt.py
-    test_treatment.py
+    test_abt.py                # protocol/mechanism correctness
+    test_treatment.py          # staked runner wiring
     test_metrics.py
     test_stats.py
     test_experiment.py
+    test_sybil.py              # identity-reset probe
 ```
 
 ## How to run tests
@@ -214,6 +248,18 @@ python run_experiment.py --config configs/experiment.yaml
 
 Output includes rates, z, p (scientific notation when small), alpha=0.05, and `SUPPORTED` / `NOT SUPPORTED BY THIS EXPERIMENT`. `SUPPORTED` is the predefined rule under that config, not a universal proof of H3. JSON and CSV go to `results/` unless `--no-save` is set.
 
+## How to run the Sybil / identity-reset test
+
+From `h3-abt/`:
+
+```bash
+python run_sybil.py
+python run_sybil.py --config configs/default.yaml
+python run_sybil.py --json
+```
+
+Output reports original/new identities, slash, remaining stake, history, whether a fresh ABT/stake was obtained, whether prior liability was bypassed, and `outcome`. This result must **not** be blended into a treatment/control table or used to change an H3 z-test verdict. The current implementation outcome is `SYBIL_SUCCEEDED`. The current prototype keys identity by `agent_id`, so a fresh identity can register again with fresh stake/history.
+
 ## Next milestone
 
-Sybil / identity-reset test, reported separately from the main treatment/control table.
+Majority-clean bar (still separate from the z-test). On-chain Solidity remains optional and unimplemented. The Sybil probe is already a separate runner and must stay separate from the treatment/control comparison.
