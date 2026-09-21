@@ -6,11 +6,12 @@ use winterfell::{
 };
 
 use crate::air::{MatchedAir, PublicInputs};
-use crate::trace::{build_trace, build_trace_with_matrix, Witness};
+use crate::lattice;
+use crate::trace::{build_trace, Witness};
 
 pub struct MatchedProver {
     options: ProofOptions,
-    lattice_c: [BaseElement; 2],
+    lattice_c: [u64; lattice::M],
     witness: Witness,
     matrix_a: [u32; 4],
     matrix_b: [u32; 4],
@@ -20,7 +21,7 @@ pub struct MatchedProver {
 impl MatchedProver {
     pub fn new(
         options: ProofOptions,
-        lattice_c: [BaseElement; 2],
+        lattice_c: [u64; lattice::M],
         witness: Witness,
     ) -> Self {
         Self {
@@ -35,7 +36,7 @@ impl MatchedProver {
 
     pub fn with_matrix(
         options: ProofOptions,
-        lattice_c: [BaseElement; 2],
+        lattice_c: [u64; lattice::M],
         witness: Witness,
         matrix_a: [u32; 4],
         matrix_b: [u32; 4],
@@ -52,16 +53,13 @@ impl MatchedProver {
     }
 
     pub fn build_trace(&self) -> TraceTable<BaseElement> {
-        build_trace_with_matrix(
+        build_trace(
             &self.witness,
+            &self.lattice_c,
             self.matrix_a,
             self.matrix_b,
             self.matrix_c,
         )
-    }
-
-    pub fn build_default_trace(&self) -> TraceTable<BaseElement> {
-        build_trace(&self.witness)
     }
 }
 

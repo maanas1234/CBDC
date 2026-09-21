@@ -5,205 +5,254 @@ use winterfell::{
 
 use crate::lattice;
 
-pub const TRACE_WIDTH: usize = 25;
-pub const TRACE_LENGTH: usize = 8;
+pub const TRACE_LENGTH: usize = 512;
 
-#[derive(Clone, Copy)]
+// 128 accumulators
+pub const ACC_START: usize = 0;
+
+// 128 quotient values
+pub const K_START: usize = 128;
+
+// 4 amount limbs
+pub const AMOUNT_START: usize = 256;
+
+// randomness
+pub const RANDOMNESS_COL: usize = 260;
+
+// clock
+pub const CLOCK_COL: usize = 261;
+
+// matrix A
+pub const MATRIX_A_START: usize = 262;
+
+// matrix B
+pub const MATRIX_B_START: usize = 266;
+
+// matrix C
+pub const MATRIX_C_START: usize = 270;
+
+// matrix outputs
+pub const MATRIX_OUT_START: usize = 274;
+
+// B coefficient columns: 128 columns
+pub const B_START: usize = 278;
+
+// amount selector
+pub const AMOUNT_SELECTOR_COL: usize = 406;
+
+// final selector
+pub const FINAL_SELECTOR_COL: usize = 407;
+
+pub const TRACE_WIDTH: usize = 408;
+
 pub struct Witness {
-    pub s0: u32,
-    pub s1: u32,
-    pub r0: u32,
-    pub r1: u32,
-    pub k0: u32,
-    pub k1: u32,
+    pub amount: u64,
+    pub r: [i64; lattice::N],
+    pub k: [i64; lattice::M],
 }
 
-/// Build the normal valid test trace.
-///
-/// A = [1 2]
-///     [3 4]
-///
-/// B = [5 6]
-///     [7 8]
-///
-/// C = [19 22]
-///     [43 50]
-pub fn build_trace(w: &Witness) -> TraceTable<BaseElement> {
-    build_trace_with_matrix(
-        w,
-        [1, 2, 3, 4],
-        [5, 6, 7, 8],
-        [19, 22, 43, 50],
-    )
+fn field_from_i64(value: i64) -> BaseElement {
+    if value >= 0 {
+        BaseElement::from(value as u64)
+    } else {
+        BaseElement::ZERO - BaseElement::from((-value) as u64)
+    }
 }
 
-/// Build a trace using explicitly supplied matrix values.
-///
-/// This is used for validation tests so that we can deliberately
-/// tamper with A, B, or C and verify that the STARK rejects it.
-pub fn build_trace_with_matrix(
-    w: &Witness,
-    a: [u32; 4],
-    b: [u32; 4],
-    c: [u32; 4],
+pub fn build_trace(
+    witness: &Witness,
+    commitment: &[u64; lattice::M],
+    matrix_a: [u32; 4],
+    matrix_b: [u32; 4],
+    matrix_c: [u32; 4],
 ) -> TraceTable<BaseElement> {
     let mut columns =
         vec![vec![BaseElement::ZERO; TRACE_LENGTH]; TRACE_WIDTH];
 
+    let amount_limbs = lattice::amount_to_limbs(witness.amount);
+
     // ---------------------------------------------------------
-    // Lattice witness: columns 0..5
+    // Amount limbs
     // ---------------------------------------------------------
 
     for row in 0..TRACE_LENGTH {
-        columns[0][row] = BaseElement::from(w.s0);
-        columns[1][row] = BaseElement::from(w.s1);
-        columns[2][row] = BaseElement::from(w.r0);
-        columns[3][row] = BaseElement::from(w.r1);
-        columns[4][row] = BaseElement::from(w.k0);
-        columns[5][row] = BaseElement::from(w.k1);
-    }
-
-    // ---------------------------------------------------------
-    // Matrix A: columns 6..9
-    //
-    // A = [A00 A01]
-    //     [A10 A11]
-    // ---------------------------------------------------------
-
-    for row in 0..TRACE_LENGTH {
-        for i in 0..4 {
-            columns[6 + i][row] = BaseElement::from(a[i]);
+        for limb in 0..lattice::LIMBS {
+            columns[AMOUNT_START + limb][row] =
+                BaseElement::from(amount_limbs[limb] as u32);
         }
     }
 
     // ---------------------------------------------------------
-    // Matrix B: columns 10..13
+    // Randomness
     //
-    // B = [B00 B01]
-    //     [B10 B11]
+    // row 0 is reserved for the amount contribution.
+    // r[0] starts at row 1.
     // ---------------------------------------------------------
 
-    for row in 0..TRACE_LENGTH {
-        for i in 0..4 {
-            columns[10 + i][row] = BaseElement::from(b[i]);
+    columns[RANDOMNESS_COL][0] = BaseElement::ZERO;
+
+    for i in 0..lattice::N {
+        columns[RANDOMNESS_COL][i + 1] =
+            field_from_i64(witness.r[i]);
+    }
+
+    for row in (lattice::N + 1)..TRACE_LENGTH {
+        columns[RANDOMNESS_COL][row] =
+            BaseElement::ZERO;
+    }
+
+    // ---------------------------------------------------------
+    // Quotients
+    // ---------------------------------------------------------
+
+    for j in 0..lattice::M {
+        for row in 0..TRACE_LENGTH {
+            columns[K_START + j][row] =
+                field_from_i64(witness.k[j]);
         }
     }
 
     // ---------------------------------------------------------
-    // Matrix output C: columns 14..17
-    //
-    // C = [C00 C01]
-    //     [C10 C11]
+    // Clock
+    // ---------------------------------------------------------
+
+    for row in 0..TRACE_LENGTH {
+        columns[CLOCK_COL][row] =
+            BaseElement::from(row as u32);
+    }
+
+    // ---------------------------------------------------------
+    // Matrix inputs
     // ---------------------------------------------------------
 
     for row in 0..TRACE_LENGTH {
         for i in 0..4 {
-            columns[14 + i][row] = BaseElement::from(c[i]);
+            columns[MATRIX_A_START + i][row] =
+                BaseElement::from(matrix_a[i]);
+
+            columns[MATRIX_B_START + i][row] =
+                BaseElement::from(matrix_b[i]);
+
+            columns[MATRIX_C_START + i][row] =
+                BaseElement::from(matrix_c[i]);
         }
     }
 
     // ---------------------------------------------------------
-    // Lattice accumulators: columns 18..19
+    // Matrix multiplication
     // ---------------------------------------------------------
 
-    columns[18][0] = BaseElement::ZERO;
-    columns[19][0] = BaseElement::ZERO;
+    let out = [
+        matrix_a[0] * matrix_b[0]
+            + matrix_a[1] * matrix_b[2],
 
-    // First lattice term.
-    columns[18][1] =
-        columns[18][0]
-        + BaseElement::from(3u32) * columns[0][0];
+        matrix_a[0] * matrix_b[1]
+            + matrix_a[1] * matrix_b[3],
 
-    columns[19][1] =
-        columns[19][0]
-        + BaseElement::from(7u32) * columns[0][0];
+        matrix_a[2] * matrix_b[0]
+            + matrix_a[3] * matrix_b[2],
 
-    // Second lattice term.
-    columns[18][2] =
-        columns[18][1]
-        + BaseElement::from(5u32) * columns[1][1];
-
-    columns[19][2] =
-        columns[19][1]
-        + BaseElement::from(11u32) * columns[1][1];
-
-    // Third lattice term.
-    columns[18][3] =
-        columns[18][2]
-        + BaseElement::from(13u32) * columns[2][2];
-
-    columns[19][3] =
-        columns[19][2]
-        + BaseElement::from(19u32) * columns[2][2];
-
-    // Fourth lattice term.
-    columns[18][4] =
-        columns[18][3]
-        + BaseElement::from(17u32) * columns[3][3];
-
-    columns[19][4] =
-        columns[19][3]
-        + BaseElement::from(23u32) * columns[3][3];
-
-    // Quotient terms.
-    columns[18][5] =
-        columns[18][4]
-        - BaseElement::from(lattice::Q as u32) * columns[4][4];
-
-    columns[19][5] =
-        columns[19][4]
-        - BaseElement::from(lattice::Q as u32) * columns[5][4];
-
-    // Public lattice commitments.
-    columns[18][6] =
-        columns[18][5] - BaseElement::from(75u32);
-
-    columns[19][6] =
-        columns[19][5] - BaseElement::from(113u32);
-
-    // Carry final accumulator value.
-    columns[18][7] = columns[18][6];
-    columns[19][7] = columns[19][6];
-
-    // ---------------------------------------------------------
-    // Clock: column 20
-    // ---------------------------------------------------------
+        matrix_a[2] * matrix_b[1]
+            + matrix_a[3] * matrix_b[3],
+    ];
 
     for row in 0..TRACE_LENGTH {
-        columns[20][row] = BaseElement::from(row as u32);
+        for i in 0..4 {
+            columns[MATRIX_OUT_START + i][row] =
+                BaseElement::from(out[i]);
+        }
     }
 
     // ---------------------------------------------------------
-    // Matrix multiplication results: columns 21..24
-    //
-    // 21 = A00*B00 + A01*B10
-    // 22 = A00*B01 + A01*B11
-    // 23 = A10*B00 + A11*B10
-    // 24 = A10*B01 + A11*B11
+    // B coefficient columns
     // ---------------------------------------------------------
 
-    columns[21][0] =
-        columns[6][0] * columns[10][0]
-        + columns[7][0] * columns[12][0];
+    for j in 0..lattice::M {
+        for row in 0..TRACE_LENGTH {
+            let coefficient =
+                if row >= 1 && row <= lattice::N {
+                    lattice::b_coeff(j, row - 1)
+                } else {
+                    0
+                };
 
-    columns[22][0] =
-        columns[6][0] * columns[11][0]
-        + columns[7][0] * columns[13][0];
+            columns[B_START + j][row] =
+                BaseElement::from(coefficient);
+        }
+    }
 
-    columns[23][0] =
-        columns[8][0] * columns[10][0]
-        + columns[9][0] * columns[12][0];
+    // ---------------------------------------------------------
+    // Amount selector
+    // ---------------------------------------------------------
 
-    columns[24][0] =
-        columns[8][0] * columns[11][0]
-        + columns[9][0] * columns[13][0];
+    columns[AMOUNT_SELECTOR_COL][0] =
+        BaseElement::from(1u32);
 
-    // Keep the computed matrix products constant across the trace.
-    for row in 1..TRACE_LENGTH {
-        columns[21][row] = columns[21][0];
-        columns[22][row] = columns[22][0];
-        columns[23][row] = columns[23][0];
-        columns[24][row] = columns[24][0];
+    // ---------------------------------------------------------
+    // Final selector
+    //
+    // transition 257 -> 258
+    // ---------------------------------------------------------
+
+    columns[FINAL_SELECTOR_COL][lattice::N + 1] =
+        BaseElement::from(1u32);
+
+    // ---------------------------------------------------------
+    // Lattice accumulators
+    // ---------------------------------------------------------
+
+    for j in 0..lattice::M {
+        columns[ACC_START + j][0] =
+            BaseElement::ZERO;
+
+        // Amount contribution.
+        let mut amount_term = BaseElement::ZERO;
+
+        for limb in 0..lattice::LIMBS {
+            amount_term +=
+                BaseElement::from(
+                    lattice::g_coeff(j, limb),
+                )
+                * columns[AMOUNT_START + limb][0];
+        }
+
+        columns[ACC_START + j][1] =
+            amount_term;
+
+        // B*r contributions.
+        for i in 0..lattice::N {
+            let previous =
+                columns[ACC_START + j][i + 1];
+
+            let contribution =
+                BaseElement::from(
+                    lattice::b_coeff(j, i),
+                )
+                * field_from_i64(witness.r[i]);
+
+            columns[ACC_START + j][i + 2] =
+                previous + contribution;
+        }
+
+        // Final commitment + quotient subtraction.
+        let before_final =
+            columns[ACC_START + j][lattice::N + 1];
+
+        let c =
+            BaseElement::from(commitment[j]);
+
+        let kq =
+            field_from_i64(witness.k[j])
+            * BaseElement::from(lattice::Q);
+
+        columns[ACC_START + j][lattice::N + 2] =
+            before_final - c - kq;
+
+        // Carry final value.
+        for row in (lattice::N + 3)..TRACE_LENGTH {
+            columns[ACC_START + j][row] =
+                columns[ACC_START + j][lattice::N + 2];
+        }
     }
 
     TraceTable::init(columns)
