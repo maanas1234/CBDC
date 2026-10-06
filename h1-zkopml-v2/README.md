@@ -7,6 +7,20 @@ This prototype tests an optimistic dispute protocol for AML inference on the Ell
 
 Results, method and pass/fail verdict: **[WRITEUP.md](WRITEUP.md)**.
 
+## Verdict summary
+
+| Criterion | Result |
+|---|---|
+| ≥10× proof latency | **Pass only at 60 blocks** (14.9× single-core, 12.6× multi-core). **Fail** at 24 blocks (7.7×) and 1 block (1.07×). |
+| ≥10× on-chain cost | **Pass amortized** (13.9× for undisputed inferences). **Fail per dispute** (2.4× more gas than monolithic). Holds on average only if fewer than 1.2% of inferences are disputed. |
+| ≤1 pp accuracy drop | **Pass** (worst case 0.13 pp). |
+| Bisection isolates the fault in bounded rounds | **Pass** (≤6 rounds for 63 steps; 7 of 7 scenarios). |
+
+Caveats to report with any speedup number:
+- The 10× latency result depends on model depth. The 60-block model is a benchmark, not a better AML model (its F1 matches the shallow one).
+- Speedup depends on hardware. Report the hardware with the number.
+- The gas target is an average over disputes, not a per-dispute win.
+
 ## Layout
 
 | File | Role |
