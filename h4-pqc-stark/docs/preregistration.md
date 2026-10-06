@@ -2,6 +2,21 @@
 
 Committed before any confirmatory run. Parameters and bounds below must not change after the run starts.
 
+## 0. Status: run HALTED, soundness defect
+
+Before running, the AIR was inspected and found not to bind the commitment:
+
+- The commitment `C` is a constant in the AIR (`lattice_c[j]`).
+- The only relation is `acc_final = C + k·Q` over the Winterfell field F_p, with p = 0x700001 = 7,340,033.
+- Q = 8,380,417 is not p. Since gcd(Q, p) = 1, for any amount and any randomness r the prover can choose `k = (acc_final − C)·Q⁻¹ mod p`. The relation holds for any amount.
+- The quotient `k` has no range check. The trace also computes the lattice relation mod p, not mod Q, so the arithmetic does not match the commitment definition.
+
+Consequence: the circuit does not enforce the lattice commitment. The benchmark in PR #9 / #12 measures the cost of a circuit that does not verify what it claims to. Those overhead numbers cannot support a security or H4 verdict.
+
+Required before any confirmatory run: non-native arithmetic mod Q (or a field where Q-arithmetic is exact), range checks on `r` and `k`, and a negative test that a witness with a wrong amount is rejected. Until then, sections 1–4 below are not executed.
+
+The parameters (section 3) and bounds (section 1) are unchanged. They are not evaluated.
+
 ## 1. Overhead bounds (unchanged from PR #12)
 
 Set on 2026-10-06 (commit `67bb47e`, as the post-hoc exploratory bounds). Reused here for the confirmatory run. They were committed before this run, so they bind it. They were **not** derived from the new run's results.
