@@ -11,16 +11,17 @@ Results, method and pass/fail verdict: **[WRITEUP.md](WRITEUP.md)**.
 
 | Criterion | Result |
 |---|---|
-| ≥10× proof latency | **Pass only at 60 blocks** (14.9× single-core, 12.6× multi-core). **Fail** at 24 blocks (7.7×), 8 blocks (3.9×) and 1 block (1.07×). |
-| ≥10× on-chain cost | **Pass amortized** (13.9× for undisputed inferences). **Fail per dispute** (2.4× more gas than monolithic). Holds on average only if fewer than 1.2% of inferences are disputed. |
+| ≥10× proof latency | **Pass only at 60 blocks** (14.9× single-core, 12.6× multi-core; multi-core measured at 60 blocks only). **Fail** at 24 blocks (7.7×), 8 blocks (3.9×) and 1 block (1.07×), all single-core. |
+| ≥10× on-chain cost | **Pass amortized** (13.9× for undisputed inferences). **Fail per dispute** (up to 2.4× more gas than monolithic in the worst case; about 1.8× typical). Holds on average only if fewer than about 1.2% of inferences are disputed (worst-case dispute cost; about 1.6% with the typical cost). |
 | ≤1 pp accuracy drop | **Pass** (worst case 0.13 pp). |
 | Bisection isolates the fault in bounded rounds | **Pass** (≤6 rounds for 63 steps; 7 of 7 scenarios). |
 
 Caveats to report with any speedup number:
 - The 10× latency result depends on model depth. The 60-block model is a benchmark, not a better AML model (its F1 matches the shallow one).
-- Speedup depends on hardware. Report the hardware with the number.
-- The gas target is an average over disputes, not a per-dispute win.
+- Speedup depends on hardware (14.9× single-core, 12.6× multi-core, both at 60 blocks). Report the hardware with the number.
+- The gas target is an average over disputes, not a per-dispute win. The 2.4× and 1.2% figures are worst-case; the typical figures are 1.8× and 1.6%.
 - The gain is in proof generation, not time-to-finality (the challenge window still applies).
+- Only four depths were measured (1, 8, 24, 60). The worst-case speedups for 1, 8 and 24 blocks reuse the slowest step time measured on the 60-block model. Do not quote a specific crossover depth; it lies somewhere between 24 and 60 blocks.
 
 ## Layout
 
@@ -59,8 +60,9 @@ python3 make_report.py
 
 ## Notes
 
-- **Timings** in `results/` come from a single-CPU machine. Expect lower absolute times on a laptop;
-  the speedup ratios are what matter.
+- **Timings** in `results/` come from a single-CPU machine. Absolute times will be lower on a
+  multi-core laptop, and the speedup ratio also shrinks (14.9× to 12.6× at 60 blocks), so always
+  state the hardware alongside any speedup number.
 - **Monolithic proof** of the 60-block model peaks around 1.3 GB RAM.
 - **Solidity verifier.** `ezkl.create_evm_verifier` writes the Solidity file first, then tries to
   download solc to build the ABI. `gas.py` ignores that download error and compiles with the local solc.
