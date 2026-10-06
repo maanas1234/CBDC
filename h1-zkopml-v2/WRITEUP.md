@@ -6,17 +6,20 @@ optimistic dispute protocol reduces proof-generation latency and on-chain verifi
 
 **Verdict.** The accuracy target is met at every depth. The 10× latency target is met **only on the 60-block model**.
 - **Proof latency.** Passes only at 60 blocks: 14.9× worst case on a single-core machine, 12.6× on a
-  multi-core laptop. Fails on shallower models (7.7× at 24 blocks, 3.9× at 8, 1.07× at 1).
+  multi-core laptop (the multi-core run was done at 60 blocks only). Fails on shallower models
+  (7.7× at 24 blocks, 3.9× at 8, 1.07× at 1; single-core).
 - **Accuracy.** Passes: the circuit's fixed-point arithmetic costs at most 0.13 pp.
-- **On-chain cost.** Passes for undisputed inferences (13.9× cheaper). Fails per dispute, where settling
-  one dispute costs 2.4× more gas than one monolithic verification. The 10× gas target therefore holds
-  on average only if fewer than 1.2% of inferences are disputed.
+- **On-chain cost.** Passes for undisputed inferences (13.9× cheaper). Fails per dispute: settling one
+  dispute costs up to 2.4× more gas than one monolithic verification (worst case; about 1.8× in the
+  typical case). The 10× gas target therefore holds on average only if fewer than about 1.2% of
+  inferences are disputed (worst-case dispute cost; about 1.6% with the typical cost).
 
 **Caveats to report with any speedup number:**
 - The 10× latency result holds only for the 60-block model, which is a benchmark, not a better AML model
   (its F1 matches the shallow one).
-- Speedup depends on hardware (14.9× single-core, 12.6× multi-core). Always state the hardware.
-- The gas target is an average over disputes, not a per-dispute win.
+- Speedup depends on hardware (14.9× single-core, 12.6× multi-core, both at 60 blocks). Always state the hardware.
+- The gas target is an average over disputes, not a per-dispute win. The 2.4× and 1.2% figures are
+  worst-case; the typical figures are 1.8× and 1.6%.
 - The gain is in proof generation, not time-to-finality (the challenge window still applies).
 
 ## 1. Setup
@@ -37,7 +40,8 @@ previous version divided by IQR + 1e-8 and produced values up to 1e9; all values
 - Every circuit is calibrated on real transactions and tuned the same way: the faster of two column
   layouts (`num_inner_cols` ∈ {2, 4}).
 - Prove times are the mean of 3 trials on a single-CPU machine. Absolute times will be lower on a
-  laptop; the ratios are what matter.
+  multi-core laptop, and the speedup ratio also shrinks (14.9× to 12.6× at 60 blocks), so always state
+  the hardware alongside any speedup number.
 
 ## 2. Method
 
@@ -76,8 +80,13 @@ the halves. The B=60 model ends up with 63 steps.
 | 24 | 27 | 2¹⁶ rows | 15.16 s | 1.98 s | **7.67×** | 7.94× | 5 |
 | 60 | 63 | 2¹⁷ rows | 29.43 s | 1.98 s | **14.9×** | 15.1× | 6 |
 
-*All speedups above were measured on a single-CPU machine. Only the 60-block row clears 10×; on a
-multi-core laptop it drops to 12.6×.*
+*All speedups above were measured on a single-CPU machine. Only the 60-block row clears 10×. The
+multi-core figure (12.6×) was measured at 60 blocks only; the other depths have no multi-core
+measurement.*
+
+*The "slowest single step" (1.98 s) is the largest per-step time measured on the B=60 model. The
+worst-case speedups for 1, 8 and 24 blocks reuse that figure, on the grounds that every step has the
+same shape at every depth; they are not separate per-depth measurements of the slowest step.*
 
 **Per-step proof times on the B=60 model:**
 - Projection halves: 1.50 s and 1.63 s.
@@ -90,7 +99,8 @@ step. See `results/speedup_vs_depth.png` for the speedup curve.
 
 **Why depth matters.** Every step has the same size at every depth (width 32), so the slowest
 step always takes about 2 s. The full proof grows with the number of layers. The speedup therefore
-rises with depth and crosses 10× somewhere between 24 and 60 blocks.
+rises with depth. Only four depths were measured (1, 8, 24, 60), and the 10× threshold falls between
+the last two, so the exact crossover depth is not known and should not be quoted.
 
 ### Dispute prototype (B=60, 7 scenarios)
 
@@ -134,16 +144,19 @@ using the test set. A Random Forest on the same split scores F1 0.77.
 | **Full dispute: 6 rounds + one step verification** | **1.26 M typical, 1.67 M worst** |
 
 - **Undisputed inference:** 13.9× cheaper than monolithic verification (passes).
-- **Per dispute:** 0.42× relative to a monolithic verification, i.e. 2.4× more expensive (fails).
-  Verification gas barely depends on circuit size, so proving one small step saves almost no gas.
-- **Break-even:** the 10× gas target holds on average only if fewer than 1.2% of inferences are disputed.
+- **Per dispute (fails):**
+  - Worst case (1.67 M gas): 0.42× relative to a monolithic verification, i.e. 2.4× more expensive.
+  - Typical case (1.26 M gas): about 0.55×, i.e. about 1.8× more expensive.
+  - Verification gas barely depends on circuit size, so proving one small step saves almost no gas.
+- **Break-even:** the 10× gas target holds on average only if the dispute rate is below about 1.2%
+  (using the worst-case dispute cost of 1.67 M) or about 1.6% (using the typical cost of 1.26 M).
 
 ## 4. Pass/fail against the pre-registered criteria
 
 | Criterion | Result |
 |---|---|
-| ≥10× proof-generation latency | **PASS only at 60 blocks** (14.9× worst case single-core, 12.6× multi-core). **FAIL** at 24 blocks or fewer (7.7× at 24, 3.9× at 8, 1.07× at 1). |
-| ≥10× on-chain verification cost | **FAIL per dispute** (0.42×). **PASS amortized** (13.9×) when disputes stay below 1.2%. |
+| ≥10× proof-generation latency | **PASS only at 60 blocks** (14.9× worst case single-core, 12.6× multi-core; multi-core measured at 60 blocks only). **FAIL** at 24 blocks or fewer (7.7× at 24, 3.9× at 8, 1.07× at 1; single-core). |
+| ≥10× on-chain verification cost | **FAIL per dispute** (0.42× worst case, about 0.55× typical). **PASS amortized** (13.9×) when disputes stay below about 1.2% (worst-case cost; about 1.6% with the typical cost). |
 | ≤1 pp accuracy drop | **PASS** (worst 0.13 pp). |
 | Bisection isolates the step in bounded rounds | **PASS** (⌈log₂ n⌉, ≤6 rounds for 63 steps; 7/7 scenarios). |
 
@@ -153,8 +166,10 @@ using the test set. A Random Forest on the same split scores F1 0.77.
    test the mechanism. It is not a better AML model: its F1 matches the shallow one. The realistic
    use case is models whose full proof is expensive (e.g., GNNs over the transaction graph).
 2. **Not every step was timed.** The blocks share one shape, so 3 of the 59 regular blocks were timed
-   directly; the dispute runs proved 4 more. Key generation happens once per step and is excluded
-   from the comparison, just as it is for the monolithic proof.
+   directly; the dispute runs proved 4 more. The slowest-step time measured on the B=60 model (1.98 s)
+   is reused for the 1-, 8- and 24-block worst-case speedups rather than re-measured at each depth.
+   Key generation happens once per step and is excluded from the comparison, just as it is for the
+   monolithic proof.
 3. **Preprocessing isn't proven.** Clipping and scaling are deterministic and public but run outside
    the circuit, so the committed input is the scaled feature vector.
 4. **Optimistic finality is slow.** A result only becomes final after the challenge window closes.
@@ -163,4 +178,9 @@ using the test set. A Random Forest on the same split scores F1 0.77.
    the running hashes, while the contract uses keccak256.
 6. **The projection halves use the more expensive column layout.** They use `num_inner_cols`=4 because
    it proves faster, and that raises their verification gas. The cheaper layout wasn't gas-measured.
-7. The speedup depends on hardware: 14.9× on a single-core machine and 12.6× on a multi-core laptop, because fixed per-proof overhead is a larger share of a small proof's time when cores are available. The margin over 10× should be reported with the hardware.
+7. **The speedup depends on hardware.** It is 14.9× on a single-core machine and 12.6× on a multi-core
+   laptop, because fixed per-proof overhead is a larger share of a small proof's time when cores are
+   available. The multi-core figure exists for the 60-block model only. The margin over 10× should be
+   reported with the hardware.
+8. **Only four depths were measured.** The speedup curve is interpolated between 1, 8, 24 and 60
+   blocks, so the depth at which the 10× threshold is crossed is unknown beyond "between 24 and 60".
