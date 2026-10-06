@@ -260,6 +260,27 @@ python run_sybil.py --json
 
 Output reports original/new identities, slash, remaining stake, history, whether a fresh ABT/stake was obtained, whether prior liability was bypassed, and `outcome`. This result must **not** be blended into a treatment/control table or used to change an H3 z-test verdict. The current implementation outcome is `SYBIL_SUCCEEDED`. The current prototype keys identity by `agent_id`, so a fresh identity can register again with fresh stake/history.
 
+## Confirmatory result (committed evidence)
+
+Config: `configs/experiment.yaml`, seed 42, n=20 per group, 50 steps (1000 actions per group). Reproduced by `python run_experiment.py --config configs/experiment.yaml`. Raw output: `results/confirmatory_seed42.json` and `.csv`.
+
+| Group | Violations | Violation rate |
+|---|---|---|
+| Control (unstaked) | 542 / 1000 | 54.2% |
+| Treatment (staked) | 319 / 1000 | 31.9% |
+
+- Absolute difference: −22.3 percentage points. Relative reduction: 41.1%.
+- One-sided two-proportion z = −10.07, p = 3.7 × 10⁻²⁴, alpha = 0.05.
+- Verdict under the predefined rule: `SUPPORTED` (this configuration only).
+
+**Limitations of this test:**
+- Pseudo-replication: the z-test treats each action as independent. Actions from the same agent across 50 steps are not independent, so the p-value is overstated. Clustered standard errors (by agent) are needed before the p-value is reported as final.
+- No minimum effect size was specified for H3 (the proposal sets only significance).
+
+**Per-agent view (not the z-test):** per-agent violation counts are in the CSV. The majority-clean bar is not yet fixed. Under a strict "zero violations" reading, 0 of 20 treatment agents pass. Under a "violation rate ≤ 50%" reading, 19 of 20 treatment agents pass and 6 of 20 control agents pass. Pending a definition before any majority verdict is written.
+
+**Sybil probe:** `SYBIL_SUCCEEDED` (documented limitation, see section 8). Not part of the z-test verdict.
+
 ## Next milestone
 
 Majority-clean bar (still separate from the z-test). On-chain Solidity remains optional and unimplemented. The Sybil probe is already a separate runner and must stay separate from the treatment/control comparison.
