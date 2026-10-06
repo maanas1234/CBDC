@@ -5,6 +5,7 @@ from dataclasses import dataclass
 import torch
 from torch_geometric.data import Data
 from boundary import payload_lookup
+from dp import dp_aggregate
 from data import device_from_config, set_seed
 from evaluate import evaluate_logits
 from model import GCN, train_local
@@ -57,13 +58,15 @@ def _institutions_and_training(data, splits, k, partition_method, scarcity, seed
     return institutions, *apply_institutional_illicit_scarcity(splits["train"], data.y, institutions, scarcity, seed)
 
 
-def run_federated(data, splits, *, k=3, partition_method="graph_aware", seed=42, rounds=10, local_epochs=1, lr=.01, hidden_dim=64, device="auto", scarcity=1., boundary_lambda=0.):
-    """Run weighted FedAvg, optionally adding label-free boundary alignment locally."""
+def run_federated(data, splits, *, k=3, partition_method="graph_aware", seed=42, rounds=10, local_epochs=1, lr=.01, hidden_dim=64, device="auto", scarcity=1., boundary_lambda=0., dp_clip=None, dp_noise=None):
+    """Run weighted FedAvg, optionally adding label-free boundary alignment and client-level DP (clip + Gaussian noise, uniform weights)."""
     set_seed(seed); dev = device_from_config(device); institutions, train_mask, scarcity_counts = _institutions_and_training(data, splits, k, partition_method, scarcity, seed)
-    model = GCN(data.num_node_features, hidden_dim).to(dev); foreign_embeddings = {}
+    model = GCN(data.num_node_features, hidden_dim).to(dev); foreign_embeddings = {}; dp_generator = torch.Generator().manual_seed(seed)
     for round_number in range(rounds):
+        global_state = model.state_dict()
         updates = [train_local(model, data, institution, train_mask, dev, local_epochs, lr, 5e-4, foreign_embeddings, boundary_lambda) for institution in institutions]
-        model.load_state_dict(fedavg([update[0] for update in updates], [update[1] for update in updates]))
+        if dp_clip is None: model.load_state_dict(fedavg([update[0] for update in updates], [update[1] for update in updates]))
+        else: model.load_state_dict(dp_aggregate(global_state, [update[0] for update in updates], dp_clip, dp_noise, dp_generator))
         foreign_embeddings = {} if boundary_lambda == 0 else payload_lookup({institution.id: update[2] for institution, update in zip(institutions, updates)})
         print(f"Round {round_number + 1}/{rounds}: aggregated {sum(update[1] for update in updates)} labelled local samples")
     model.eval()
