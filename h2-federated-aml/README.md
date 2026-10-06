@@ -47,6 +47,28 @@ In a real VASP deployment, an agreed privacy-preserving counterparty/transfer id
 
 `boundary.py` validates the research payload shape and prevents this code path from carrying raw features or neighbourhoods. The simulation shares model updates and learned boundary embeddings only. It does **not** implement secure aggregation, encryption, differential privacy, a privacy proof, or production authentication. Embeddings can leak information and should not be described as formally private.
 
+## Status and recorded findings
+
+Committed results: `results/*.csv`, seed 42 only, K=3 unless stated.
+
+| Setting | Centralized GCN | Local-only | FedAvg | FedAvg + boundary |
+|---|---|---|---|---|
+| 100% labels, F1 | 0.743 | 0.499 | 0.401 | 0.402 |
+| 100% labels, false positives | 114 | 323 | 1394 | 1391 |
+| 20% labels, F1 | not run | 0.214 | 0.374 | 0.374 |
+| 10% labels, F1 | not run | 0.009 | 0.147 | 0.128 |
+
+What these show:
+- At full labels, FedAvg produces about 12× the false positives of the centralized model and a lower F1. Federation costs accuracy here.
+- The "federation degrades less under scarcity" pattern is partly an artifact. Federated F1 starts lower, so its drop is smaller. It is not evidence that federation beats the baseline.
+- The boundary channel does not help. Differences from FedAvg are within ±0.02 and change sign across scarcity levels. Raising lambda from 0 to 1.0 lowers F1 monotonically (0.147 → 0.012).
+
+**Original H2 criterion not yet tested.** It requires a federated vs centralized comparison under each scarcity level, ≥20% fewer false positives, multiple seeds, and a significance test. Missing:
+1. Centralized GCN run at each scarcity level (only the 100% run exists).
+2. Multiple seeds (all results are seed 42).
+3. A significance test on false-positive counts.
+4. Differential privacy. The code does not implement DP, so the ε bound in the original hypothesis is unmeasured.
+
 ## Interpreting H2
 
 For every measured scarcity level, compare local-only, FedAvg, and FedAvg + boundary alignment. Degradation is `metric(100%) - metric(level)`; positive mitigation is `degradation(FedAvg) - degradation(boundary)`. Run multiple seeds and report variation before drawing an inference. A positive mitigation alone is not proof: the result may support, partially support, fail to support, or falsify H2 under the tested conditions. Do not change the evaluation set or tune against a desired conclusion.
