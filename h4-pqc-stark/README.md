@@ -120,17 +120,17 @@ Result: PASS — correctly rejected
 
 These tests demonstrate that the current AIR rejects invalid matrix computations.
 
-## 5. Pre-registered Bound
+## 5. Post-hoc Exploratory Bounds
 
-Before evaluating the production-parameter benchmark results, the following overhead bounds were pre-registered relative to the matched classical STARK baseline:
+The following overhead bounds are **post-hoc exploratory bounds** relative to the matched classical STARK baseline. They were documented after the existing benchmark results and therefore must not be treated as pre-registered or confirmatory thresholds.
 
-| Metric | Pre-registered bound |
+| Metric | Post-hoc exploratory bound |
 |---|---:|
 | Proof size | ≤ 20× |
 | Proving time | ≤ 200× |
 | Verification time | ≤ 10× |
 
-These bounds define a practical feasibility threshold rather than a cryptographic security target.
+These bounds define a practical feasibility threshold rather than a cryptographic security target. They are retained for transparent reporting of the existing experiment, not as evidence of a confirmatory H4 result.
 
 The verification-time bound is the most operationally constrained because proof verification is on the critical path for settlement validation. A 10× bound over the matched classical verification time of 0.187 ms corresponds to approximately 1.87 ms, which remains in the low-millisecond range.
 
@@ -138,19 +138,17 @@ A looser 200× bound is used for proving time because proving is expected to occ
 
 The 20× proof-size bound allows substantial post-quantum overhead while keeping the resulting proof below approximately 45 KB relative to the 2,233-byte matched classical proof.
 
-These bounds were fixed before evaluating the production-parameter results below and are not adjusted based on the observed measurements.
-
 ## 6. Matched PQ Benchmark
 
 The production-parameter PQ implementation was benchmarked against the matched classical baseline.
 
-| Metric | Matched classical | PQ production candidate | PQ / Classical | Pre-registered bound | Result |
+| Metric | Matched classical | PQ production candidate | PQ / Classical | Post-hoc exploratory bound | Result |
 |---|---:|---:|---:|---:|---|
 | Proof size | 2,233 B | 31,792 B | 14.2× | ≤ 20× | PASS |
 | Mean proving time | 0.448 ms | ~70 ms | ~156× | ≤ 200× | PASS |
 | Mean verification time | 0.187 ms | 1.10 ms | 5.9× | ≤ 10× | PASS |
 
-The observed overheads therefore remain within the pre-registered bounds for the evaluated 2×2 matrix-multiplication workload.
+The observed overheads therefore remain within the **post-hoc exploratory bounds** for the evaluated 2×2 matrix-multiplication workload.
 
 These measurements apply only to the current prototype, parameterization, and workload. They do not establish the security or production readiness of the parameter set.
 
@@ -162,9 +160,9 @@ For the evaluated 2×2 matrix-multiplication workload, incorporating the lattice
 - 156× proving-time overhead
 - 5.9× verification-time overhead
 
-All three observed overheads are within the pre-registered bounds.
+All three observed overheads are within the **post-hoc exploratory bounds**.
 
-These results provide preliminary evidence supporting the bounded-overhead component of H4 for the evaluated prototype and workload.
+Because the bounds were defined after the existing results, these passes are **exploratory rather than confirmatory evidence** for H4.
 
 The verification overhead is approximately 1.10 ms, remaining in the low-millisecond range despite the addition of the lattice-backed relation.
 
@@ -198,8 +196,11 @@ Therefore, the current benchmark should be interpreted as a performance and feas
 4. The current prototype is not an externally reviewed post-quantum cryptographic construction.
 5. The settlement-layer migration claim has not been validated through a production CBDC implementation.
 6. The current benchmark does not establish end-to-end ZKML performance for realistic model sizes or inference workloads.
+7. The existing overhead bounds are post-hoc exploratory thresholds because they were documented after the benchmark results; they are not confirmatory acceptance criteria.
 
 ## 10. Next Research Step
+
+For a **confirmatory H4 result**, the next phase should first commit new overhead bounds before running the new experiment. The new parameters and workload should then be benchmarked without changing those bounds based on the observed results.
 
 The next experimental phase should investigate realistic lattice parameters corresponding to a defensible post-quantum security target.
 
@@ -244,13 +245,15 @@ experiments/benchmark_results.csv
 
 ## Conclusion
 
-For the currently evaluated 2×2 matrix-multiplication workload, the production-candidate lattice-backed STARK remains within all three pre-registered overhead bounds:
+For the currently evaluated 2×2 matrix-multiplication workload, the production-candidate lattice-backed STARK remains within all three **post-hoc exploratory bounds**:
 
 - **Proof size:** 14.2× ≤ 20× — PASS
 - **Proving time:** ~156× ≤ 200× — PASS
 - **Verification time:** 5.9× ≤ 10× — PASS
 
-The results therefore support the bounded-overhead component of H4 for this specific experimental workload.
+These passes should be interpreted as **exploratory, not confirmatory**, because the bounds were documented after the existing benchmark results.
+
+The results therefore support the bounded-overhead component of H4 only as an **exploratory finding** for this specific experimental workload.
 
 However, H4 is **not yet fully established**. The current experiment does not cover the model classes used in H1-H3, and the `research-candidate-128x256` parameters have not been assigned a defensible post-quantum security level through a concrete SIS security analysis.
 
