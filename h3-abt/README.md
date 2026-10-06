@@ -277,7 +277,14 @@ Config: `configs/experiment.yaml`, seed 42, n=20 per group, 50 steps (1000 actio
 - Pseudo-replication: the z-test treats each action as independent. Actions from the same agent across 50 steps are not independent, so the p-value is overstated. Clustered standard errors (by agent) are needed before the p-value is reported as final.
 - No minimum effect size was specified for H3 (the proposal sets only significance).
 
-**Per-agent view (not the z-test):** per-agent violation counts are in the CSV. The majority-clean bar is not yet fixed. Under a strict "zero violations" reading, 0 of 20 treatment agents pass. Under a "violation rate ≤ 50%" reading, 19 of 20 treatment agents pass and 6 of 20 control agents pass. Pending a definition before any majority verdict is written.
+**Majority-clean bar (post-hoc definition).** Owner's rule: with n agents, at least n/2 must pass. An agent **passes** if its violation rate over the run is at most 50%. This definition was chosen after the per-agent counts were viewed, so it is **post-hoc and exploratory**, not pre-registered. A strict "zero violations" reading was considered and rejected as too strict to be a useful bar; under it, 0 of 20 treatment agents pass.
+
+| Group | Agents passing (rate ≤ 50%) | Bar (n/2) | Majority bar met |
+|---|---|---|---|
+| Treatment (staked) | 19 / 20 | 10 | Yes |
+| Control (unstaked) | 6 / 20 | 10 | No |
+
+The majority bar is separate from the z-test verdict. Both are reported; neither replaces the other.
 
 **Sybil probe:** `SYBIL_SUCCEEDED` (documented limitation, see section 8). Not part of the z-test verdict.
 
