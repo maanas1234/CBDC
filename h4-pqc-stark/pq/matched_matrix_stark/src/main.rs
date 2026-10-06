@@ -6,14 +6,13 @@ mod trace;
 use std::time::Instant;
 
 use winterfell::{
-    math::fields::f23201::BaseElement,
     FieldExtension,
     HashFunction,
     ProofOptions,
     Prover,
-    Trace,
 };
 
+use crate::lattice::{compute_commitment, compute_quotients};
 use crate::prover::MatchedProver;
 use crate::trace::Witness;
 
@@ -30,34 +29,57 @@ fn options() -> ProofOptions {
 }
 
 fn valid_witness() -> Witness {
+    let amount: u64 = 123_456_789;
+
+    let mut r = [0i64; lattice::N];
+
+    // Deterministic bounded randomness.
+    for i in 0..lattice::N {
+        let x =
+            ((i as i64 * 7919 + 104729) % (2 * lattice::BETA + 1))
+                - lattice::BETA;
+
+        r[i] = x;
+    }
+
+    let commitment =
+        compute_commitment(amount, &r);
+
+    let k =
+        compute_quotients(amount, &r, &commitment);
+
     Witness {
-        s0: 2,
-        s1: 1,
-        r0: 1,
-        r1: 3,
-        k0: 0,
-        k1: 0,
+        amount,
+        r,
+        k,
     }
 }
 
-fn lattice_commitment() -> [BaseElement; 2] {
-    [
-        BaseElement::from(75u32),
-        BaseElement::from(113u32),
-    ]
-}
-
 fn main() {
-    println!("H4 — Matched Matrix + Lattice STARK Benchmark");
-    println!("==============================================");
+    println!("H4 — Matched Matrix + Research-Candidate SIS STARK");
+    println!("==================================================");
+    println!("profile: {}", lattice::SECURITY_PROFILE);
+    println!("q: {}", lattice::Q);
+    println!("M: {}", lattice::M);
+    println!("N: {}", lattice::N);
+    println!("beta: {}", lattice::BETA);
     println!();
+
     println!("system,run,proof_bytes,prove_ms,verify_ms");
 
     for run in 1..=10 {
+        let witness = valid_witness();
+
+        let commitment =
+            compute_commitment(
+                witness.amount,
+                &witness.r,
+            );
+
         let prover = MatchedProver::with_matrix(
             options(),
-            lattice_commitment(),
-            valid_witness(),
+            commitment,
+            witness,
             [1, 2, 3, 4],
             [5, 6, 7, 8],
             [19, 22, 43, 50],
@@ -70,18 +92,25 @@ fn main() {
         let proof = match prover.prove(trace) {
             Ok(proof) => proof,
             Err(err) => {
-                eprintln!("Run {}: proof generation failed: {:?}", run, err);
+                eprintln!(
+                    "Run {}: proof generation failed: {:?}",
+                    run,
+                    err
+                );
                 return;
             }
         };
 
-        let prove_ms = start.elapsed().as_secs_f64() * 1000.0;
+        let prove_ms =
+            start.elapsed().as_secs_f64() * 1000.0;
 
-        let proof_bytes = proof.to_bytes().len();
+        let proof_bytes =
+            proof.to_bytes().len();
 
-        let public_inputs = prover.get_pub_inputs(
-            &prover.build_trace()
-        );
+        let public_inputs =
+            prover.get_pub_inputs(
+                &prover.build_trace()
+            );
 
         let start = Instant::now();
 
@@ -91,12 +120,13 @@ fn main() {
                 public_inputs,
             );
 
-        let verify_ms = start.elapsed().as_secs_f64() * 1000.0;
+        let verify_ms =
+            start.elapsed().as_secs_f64() * 1000.0;
 
         match verification {
             Ok(_) => {
                 println!(
-                    "pq_matched,{},{},{:.3},{:.3}",
+                    "pq_matched_research_candidate,{},{},{:.3},{:.3}",
                     run,
                     proof_bytes,
                     prove_ms,
