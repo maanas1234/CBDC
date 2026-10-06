@@ -4,12 +4,20 @@
 optimistic dispute protocol reduces proof-generation latency and on-chain verification cost by
 ≥10× relative to a monolithic ZKML proof, with ≤1 pp accuracy loss.
 
-**Verdict.** The latency target and the accuracy target are both met, but only on deep enough models.
-- **Proof latency.** Passes on the 60-block model (14.9× in the worst case). Fails on shallow models.
+**Verdict.** The accuracy target is met at every depth. The 10× latency target is met **only on the 60-block model**.
+- **Proof latency.** Passes only at 60 blocks: 14.9× worst case on a single-core machine, 12.6× on a
+  multi-core laptop. Fails on shallower models (7.7× at 24 blocks, 3.9× at 8, 1.07× at 1).
 - **Accuracy.** Passes: the circuit's fixed-point arithmetic costs at most 0.13 pp.
 - **On-chain cost.** Passes for undisputed inferences (13.9× cheaper). Fails per dispute, where settling
   one dispute costs 2.4× more gas than one monolithic verification. The 10× gas target therefore holds
   on average only if fewer than 1.2% of inferences are disputed.
+
+**Caveats to report with any speedup number:**
+- The 10× latency result holds only for the 60-block model, which is a benchmark, not a better AML model
+  (its F1 matches the shallow one).
+- Speedup depends on hardware (14.9× single-core, 12.6× multi-core). Always state the hardware.
+- The gas target is an average over disputes, not a per-dispute win.
+- The gain is in proof generation, not time-to-finality (the challenge window still applies).
 
 ## 1. Setup
 
@@ -67,6 +75,9 @@ the halves. The B=60 model ends up with 63 steps.
 | 8  | 11 | 2¹⁵ rows | 7.67 s  | 1.98 s | **3.88×** | 4.24× | 4 |
 | 24 | 27 | 2¹⁶ rows | 15.16 s | 1.98 s | **7.67×** | 7.94× | 5 |
 | 60 | 63 | 2¹⁷ rows | 29.43 s | 1.98 s | **14.9×** | 15.1× | 6 |
+
+*All speedups above were measured on a single-CPU machine. Only the 60-block row clears 10×; on a
+multi-core laptop it drops to 12.6×.*
 
 **Per-step proof times on the B=60 model:**
 - Projection halves: 1.50 s and 1.63 s.
@@ -131,7 +142,7 @@ using the test set. A Random Forest on the same split scores F1 0.77.
 
 | Criterion | Result |
 |---|---|
-| ≥10× proof-generation latency | **PASS** at 60 blocks (14.9× worst case). **FAIL** at 24 blocks or fewer (7.7× at 24, 1.07× at 1). |
+| ≥10× proof-generation latency | **PASS only at 60 blocks** (14.9× worst case single-core, 12.6× multi-core). **FAIL** at 24 blocks or fewer (7.7× at 24, 3.9× at 8, 1.07× at 1). |
 | ≥10× on-chain verification cost | **FAIL per dispute** (0.42×). **PASS amortized** (13.9×) when disputes stay below 1.2%. |
 | ≤1 pp accuracy drop | **PASS** (worst 0.13 pp). |
 | Bisection isolates the step in bounded rounds | **PASS** (⌈log₂ n⌉, ≤6 rounds for 63 steps; 7/7 scenarios). |
