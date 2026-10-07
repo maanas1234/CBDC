@@ -1,0 +1,21 @@
+H4 — Matched Matrix + Research-Candidate SIS STARK
+==================================================
+profile: research-candidate-128x256
+q: 8380417
+M: 128
+N: 256
+beta: 131071
+
+system,run,proof_bytes,prove_ms,verify_ms
+pq_matched_research_candidate,1,33214,77.128,1.385
+pq_matched_research_candidate,2,33214,68.758,1.155
+pq_matched_research_candidate,3,33214,68.770,1.114
+pq_matched_research_candidate,4,33214,68.834,1.160
+pq_matched_research_candidate,5,33214,68.839,1.131
+pq_matched_research_candidate,6,33214,68.725,1.130
+pq_matched_research_candidate,7,33214,68.583,1.139
+pq_matched_research_candidate,8,33214,68.686,1.122
+pq_matched_research_candidate,9,33214,68.747,1.126
+pq_matched_research_candidate,10,33214,68.749,1.141
+
+Benchmark complete: 10/10 successful.

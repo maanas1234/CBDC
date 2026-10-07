@@ -148,3 +148,42 @@ fn main() {
     println!();
     println!("Benchmark complete: 10/10 successful.");
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::air::MatchedAir;
+
+    #[test]
+    fn commitment_tampering_must_fail_verification() {
+        let witness = valid_witness();
+
+        let commitment = compute_commitment(witness.amount, &witness.r);
+
+        let prover = MatchedProver::with_matrix(
+            options(),
+            commitment,
+            witness,
+            [1, 2, 3, 4],
+            [5, 6, 7, 8],
+            [19, 22, 43, 50],
+        );
+
+        let trace = prover.build_trace();
+        let proof = prover.prove(trace).expect("proof generation failed");
+
+        let mut bad_public_inputs =
+            prover.get_pub_inputs(&prover.build_trace());
+
+        // Deliberately change the public commitment.
+        bad_public_inputs.lattice_c[0] ^= 1;
+
+        let result =
+            winterfell::verify::<MatchedAir>(proof, bad_public_inputs);
+
+        assert!(
+            result.is_err(),
+            "verification unexpectedly succeeded with a tampered commitment"
+        );
+    }
+}

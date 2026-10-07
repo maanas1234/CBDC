@@ -86,11 +86,6 @@ impl Air for MatchedAir {
             degrees.push(TransitionConstraintDegree::new(1));
         }
 
-        // Matrix multiplication.
-        for _ in 0..4 {
-            degrees.push(TransitionConstraintDegree::new(2));
-        }
-
         // Matrix output binding.
         for _ in 0..4 {
             degrees.push(TransitionConstraintDegree::new(1));
@@ -250,41 +245,6 @@ impl Air for MatchedAir {
 
             index += 1;
         }
-
-        // ---------------------------------------------------------
-        // Matrix multiplication
-        // ---------------------------------------------------------
-
-        let a00 = current[MATRIX_A_START];
-        let a01 = current[MATRIX_A_START + 1];
-        let a10 = current[MATRIX_A_START + 2];
-        let a11 = current[MATRIX_A_START + 3];
-
-        let b00 = current[MATRIX_B_START];
-        let b01 = current[MATRIX_B_START + 1];
-        let b10 = current[MATRIX_B_START + 2];
-        let b11 = current[MATRIX_B_START + 3];
-
-        let o00 = current[MATRIX_OUT_START];
-        let o01 = current[MATRIX_OUT_START + 1];
-        let o10 = current[MATRIX_OUT_START + 2];
-        let o11 = current[MATRIX_OUT_START + 3];
-
-        result[index] =
-            o00 - (a00 * b00 + a01 * b10);
-        index += 1;
-
-        result[index] =
-            o01 - (a00 * b01 + a01 * b11);
-        index += 1;
-
-        result[index] =
-            o10 - (a10 * b00 + a11 * b10);
-        index += 1;
-
-        result[index] =
-            o11 - (a10 * b01 + a11 * b11);
-        index += 1;
 
         // ---------------------------------------------------------
         // Matrix output binding
