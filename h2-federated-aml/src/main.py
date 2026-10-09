@@ -9,6 +9,7 @@ from evaluate import evaluate_logits
 from experiments import run_config
 from federated import run_federated
 from model import GCN
+from result_labels import federated_method_label
 
 
 def run_centralized(epochs=100, seed=42, device="auto"):
@@ -29,15 +30,16 @@ def main() -> None:
     parser = argparse.ArgumentParser(); commands = parser.add_subparsers(dest="command", required=True)
     commands.add_parser("inspect-data"); commands.add_parser("prepare-data")
     centralized = commands.add_parser("centralized"); centralized.add_argument("--epochs", type=int, default=100); centralized.add_argument("--seed", type=int, default=42); centralized.add_argument("--device", default="auto")
-    federated = commands.add_parser("federated"); federated.add_argument("--institutions", type=int, default=3, choices=[2, 3, 5]); federated.add_argument("--rounds", type=int, default=10); federated.add_argument("--local-epochs", type=int, default=1); federated.add_argument("--partition", default="graph_aware", choices=["graph_aware", "random"]); federated.add_argument("--seed", type=int, default=42)
+    federated = commands.add_parser("federated"); federated.add_argument("--institutions", type=int, default=3, choices=[2, 3, 5]); federated.add_argument("--rounds", type=int, default=10); federated.add_argument("--local-epochs", type=int, default=1); federated.add_argument("--partition", default="graph_aware", choices=["graph_aware", "random"]); federated.add_argument("--seed", type=int, default=42); federated.add_argument("--institution-privacy", action="store_true", help="clip and Gaussian-noise institution model updates and boundary embeddings"); federated.add_argument("--privacy-clip-norm", type=float, default=1.0); federated.add_argument("--privacy-noise-multiplier", type=float, default=1.0)
     full = commands.add_parser("full-experiment"); full.add_argument("--config", default=str(RESULTS_DIR.parent / "experiments" / "configs" / "default.yaml"))
     args = parser.parse_args()
     if args.command == "inspect-data": inspect_data()
     elif args.command == "prepare-data": prepare_data()
     elif args.command == "centralized": run_centralized(args.epochs, args.seed, args.device)
     elif args.command == "federated":
-        data = load_graph(); metrics, institutions, model, _, counts = run_federated(data, make_splits(data.y, args.seed), k=args.institutions, partition_method=args.partition, seed=args.seed, rounds=args.rounds, local_epochs=args.local_epochs)
-        RESULTS_DIR.mkdir(exist_ok=True); pd.DataFrame([{**metrics, "method": "fedavg", "institutions": args.institutions, "partition": args.partition, "scarcity": 1.0}]).to_csv(RESULTS_DIR / "federated_results.csv", index=False); pd.DataFrame([institution.stats for institution in institutions]).to_csv(RESULTS_DIR / "institution_stats.csv", index=False); pd.DataFrame(counts).to_csv(RESULTS_DIR / "per_institution_scarcity_counts.csv", index=False); torch.save(model.state_dict(), RESULTS_DIR / "fedavg_gcn.pt"); print(metrics)
+        data = load_graph(); metrics, institutions, model, _, counts = run_federated(data, make_splits(data.y, args.seed), k=args.institutions, partition_method=args.partition, seed=args.seed, rounds=args.rounds, local_epochs=args.local_epochs, privacy={"enabled": args.institution_privacy, "clip_norm": args.privacy_clip_norm, "noise_multiplier": args.privacy_noise_multiplier})
+        method = federated_method_label(args.institution_privacy)
+        RESULTS_DIR.mkdir(exist_ok=True); pd.DataFrame([{**metrics, "method": method, "institutions": args.institutions, "partition": args.partition, "scarcity": 1.0}]).to_csv(RESULTS_DIR / "federated_results.csv", index=False); pd.DataFrame([institution.stats for institution in institutions]).to_csv(RESULTS_DIR / "institution_stats.csv", index=False); pd.DataFrame(counts).to_csv(RESULTS_DIR / "per_institution_scarcity_counts.csv", index=False); torch.save(model.state_dict(), RESULTS_DIR / "fedavg_gcn.pt"); print(metrics)
     else: run_config(args.config)
 
 

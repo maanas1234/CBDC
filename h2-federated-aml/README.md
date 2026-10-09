@@ -25,7 +25,7 @@ pytest -q tests
 python src/main.py full-experiment --config experiments/configs/default.yaml
 ```
 
-`python src/main.py full-experiment --config experiments/configs/default.yaml` is the complete H2 command. It runs the K=3 Local-only/FedAvg/FedAvg+Boundary scarcity comparison; the six-value lambda ablation at fixed 10% scarcity; and the K=2/3/5 method comparison at fixed 10% scarcity. It writes only measured rows: `scarcity_results.csv`, `boundary_results.csv`, `federated_results.csv`, `lambda_ablation_results.csv`, `institution_count_ablation_results.csv`, `ablation_results.csv`, `per_institution_scarcity_counts.csv`, `institution_stats.csv`, and six figures.
+`python src/main.py full-experiment --config experiments/configs/default.yaml` is the complete H2 command. It runs the K=3 Local-only/FedAvg/FedAvg+Boundary scarcity comparison; the six-value lambda ablation at fixed 10% scarcity; and the K=2/3/5 method comparison at fixed 10% scarcity, for every seed listed in the YAML `seeds` array. It writes only measured rows, plus `scarcity_summary.csv` (mean/sample standard deviation) and `paired_significance.csv` (matched-seed two-sided Wilcoxon signed-rank tests).
 
 ## Experimental design
 
@@ -45,7 +45,9 @@ In a real VASP deployment, an agreed privacy-preserving counterparty/transfer id
 
 ## Privacy scope and limitations
 
-`boundary.py` validates the research payload shape and prevents this code path from carrying raw features or neighbourhoods. The simulation shares model updates and learned boundary embeddings only. It does **not** implement secure aggregation, encryption, differential privacy, a privacy proof, or production authentication. Embeddings can leak information and should not be described as formally private.
+`boundary.py` validates the research payload shape and prevents this code path from carrying raw features or neighbourhoods. The simulation exchanges model updates and learned boundary embeddings; optional update perturbation is described below. It does **not** implement secure aggregation, encryption, a privacy proof, or production authentication.
+
+Optional institution-level update perturbation is available via `privacy.enabled` in the experiment config, or `--institution-privacy` for `src/main.py federated`. Each institution's whole model delta is jointly L2-clipped and Gaussian-noised before weighted FedAvg, and boundary embedding vectors are separately clipped/noised before export. This is institution-level update privacy engineering, not transaction-level differential privacy. The simulated boundary IDs and sample counts used as aggregation weights remain visible; model outputs and metrics remain observable. There is no accountant or calibrated end-to-end epsilon/delta, secure aggregation, encryption, or formal privacy guarantee. Configure `clip_norm` and `noise_multiplier` explicitly; do not claim transaction-level privacy or a quantified DP guarantee.
 
 ## Interpreting H2
 

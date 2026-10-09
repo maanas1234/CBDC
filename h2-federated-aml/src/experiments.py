@@ -6,6 +6,7 @@ import pandas as pd
 import yaml
 from data import RESULTS_DIR, load_graph, make_splits
 from federated import run_federated, run_local_only
+from eval_stats import paired_significance, summarize_results
 
 METHODS = (("local_only", None), ("fedavg", 0.0), ("fedavg_boundary", "configured"))
 
@@ -13,7 +14,7 @@ METHODS = (("local_only", None), ("fedavg", 0.0), ("fedavg_boundary", "configure
 def _run_case(data, splits, config, seed, institution_count, scarcity, method, boundary_lambda):
     common = dict(k=institution_count, partition_method=config["partition_method"], seed=seed, lr=config["learning_rate"], hidden_dim=config["hidden_dim"], device=config["device"], scarcity=scarcity)
     if method == "local_only": metrics, institutions, _, counts = run_local_only(data, splits, epochs=config["global_rounds"] * config["local_epochs"], **common)
-    else: metrics, institutions, _, _, counts = run_federated(data, splits, rounds=config["global_rounds"], local_epochs=config["local_epochs"], boundary_lambda=boundary_lambda, **common)
+    else: metrics, institutions, _, _, counts = run_federated(data, splits, rounds=config["global_rounds"], local_epochs=config["local_epochs"], boundary_lambda=boundary_lambda, privacy=config.get("privacy"), **common)
     row = {**metrics, "method": method, "scarcity": float(scarcity), "seed": seed, "institutions": institution_count, "lambda": float(boundary_lambda or 0.0), "partition_method": config["partition_method"]}
     for count in counts: count.update({"method": method, "seed": seed, "institutions": institution_count, "partition_method": config["partition_method"]})
     return row, institutions, counts
@@ -44,6 +45,8 @@ def write_outputs(main_results, lambda_results, institution_results, scarcity_co
     main_results.to_csv(results_dir / "scarcity_results.csv", index=False); main_results[main_results["method"] == "fedavg_boundary"].to_csv(results_dir / "boundary_results.csv", index=False); main_results[(main_results["method"] == "fedavg") & (main_results["scarcity"] == 1.0)].to_csv(results_dir / "federated_results.csv", index=False)
     lambda_results.to_csv(results_dir / "lambda_ablation_results.csv", index=False); institution_results.to_csv(results_dir / "institution_count_ablation_results.csv", index=False)
     pd.concat([main_results, lambda_results, institution_results], ignore_index=True).to_csv(results_dir / "ablation_results.csv", index=False)
+    summarize_results(main_results).to_csv(results_dir / "scarcity_summary.csv", index=False)
+    paired_significance(main_results).to_csv(results_dir / "paired_significance.csv", index=False)
     pd.DataFrame(scarcity_counts).to_csv(results_dir / "per_institution_scarcity_counts.csv", index=False); pd.DataFrame(institution_stats).drop_duplicates().to_csv(results_dir / "institution_stats.csv", index=False)
     _make_figures(main_results, pd.DataFrame(institution_stats), figures)
 

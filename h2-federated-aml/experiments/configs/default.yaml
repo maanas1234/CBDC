@@ -1,5 +1,5 @@
 seed: 42
-seeds: [42]
+seeds: [42, 43, 44, 45, 46]
 institutions: 3
 partition_method: graph_aware
 scarcity_levels: [1.0, 0.5, 0.2, 0.1, 0.05, 0.01]
@@ -13,3 +13,7 @@ lambda_ablation_scarcity: 0.1
 institution_counts: [2, 3, 5]
 institution_ablation_scarcity: 0.1
 device: auto
+privacy:
+  enabled: false
+  clip_norm: 1.0
+  noise_multiplier: 1.0

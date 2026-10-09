@@ -9,6 +9,7 @@ from data import device_from_config, set_seed
 from evaluate import evaluate_logits
 from model import GCN, train_local
 from scarcity import apply_institutional_illicit_scarcity
+from privacy import privatize_model_update, privatize_boundary_payload
 
 
 @dataclass
@@ -57,14 +58,24 @@ def _institutions_and_training(data, splits, k, partition_method, scarcity, seed
     return institutions, *apply_institutional_illicit_scarcity(splits["train"], data.y, institutions, scarcity, seed)
 
 
-def run_federated(data, splits, *, k=3, partition_method="graph_aware", seed=42, rounds=10, local_epochs=1, lr=.01, hidden_dim=64, device="auto", scarcity=1., boundary_lambda=0.):
+def run_federated(data, splits, *, k=3, partition_method="graph_aware", seed=42, rounds=10, local_epochs=1, lr=.01, hidden_dim=64, device="auto", scarcity=1., boundary_lambda=0., privacy=None):
     """Run weighted FedAvg, optionally adding label-free boundary alignment locally."""
     set_seed(seed); dev = device_from_config(device); institutions, train_mask, scarcity_counts = _institutions_and_training(data, splits, k, partition_method, scarcity, seed)
     model = GCN(data.num_node_features, hidden_dim).to(dev); foreign_embeddings = {}
+    privacy = privacy or {}; privacy_enabled = bool(privacy.get("enabled", False))
+    noise_generator = torch.Generator().manual_seed(seed + 104729)
     for round_number in range(rounds):
         updates = [train_local(model, data, institution, train_mask, dev, local_epochs, lr, 5e-4, foreign_embeddings, boundary_lambda) for institution in institutions]
-        model.load_state_dict(fedavg([update[0] for update in updates], [update[1] for update in updates]))
-        foreign_embeddings = {} if boundary_lambda == 0 else payload_lookup({institution.id: update[2] for institution, update in zip(institutions, updates)})
+        if privacy_enabled:
+            protected_states = [privatize_model_update(model.state_dict(), update[0], privacy["clip_norm"], privacy["noise_multiplier"], generator=noise_generator) for update in updates]
+            # The institution's sample count is metadata used as FedAvg weight.
+            # It is not hidden by this mechanism.
+            model.load_state_dict(fedavg(protected_states, [update[1] for update in updates]))
+            payloads = {institution.id: privatize_boundary_payload(update[2], privacy["clip_norm"], privacy["noise_multiplier"], generator=noise_generator) for institution, update in zip(institutions, updates)}
+        else:
+            model.load_state_dict(fedavg([update[0] for update in updates], [update[1] for update in updates]))
+            payloads = {institution.id: update[2] for institution, update in zip(institutions, updates)}
+        foreign_embeddings = {} if boundary_lambda == 0 else payload_lookup(payloads)
         print(f"Round {round_number + 1}/{rounds}: aggregated {sum(update[1] for update in updates)} labelled local samples")
     model.eval()
     with torch.no_grad(): logits = model(data.x.to(dev), data.edge_index.to(dev)).cpu()
