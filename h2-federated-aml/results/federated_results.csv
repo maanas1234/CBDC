@@ -1,2 +1,2 @@
-accuracy,precision,recall,f1,pr_auc,confusion_matrix,roc_auc,method,scarcity,seed,institutions,lambda,partition_method,experiment,degradation_f1
-0.7774119667907243,0.2720626631853786,0.7639296187683284,0.4012321909896034,0.3250569533430913,"[[4910, 1394], [161, 521]]",0.8429098687050628,fedavg,1.0,42,3,0.0,graph_aware,main_scarcity,0.0
+accuracy,precision,recall,f1,pr_auc,confusion_matrix,roc_auc,method,institutions,partition,scarcity
+0.8345261952476382,0.04597701149425287,0.03519061583577713,0.03986710963455149,0.09425595438930416,"[[5806, 498], [658, 24]]",0.4994332835271,fedavg_institution_privacy,3,graph_aware,1.0
