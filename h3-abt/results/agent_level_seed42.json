@@ -1,0 +1,15 @@
+{
+  "n_control_agents": 20,
+  "n_treatment_agents": 20,
+  "control_mean_rate": 0.542,
+  "treatment_mean_rate": 0.31899999999999995,
+  "mean_difference": -0.2230000000000001,
+  "mann_whitney_u": 25.5,
+  "mann_whitney_z": -4.72845371117548,
+  "mann_whitney_p_one_sided": 1.1311809416608154e-06,
+  "permutation_p_one_sided": 9.99990000099999e-06,
+  "permutations": 100000,
+  "permutation_seed": 42,
+  "majority_bar_treatment": 19,
+  "majority_bar_control": 7
+}
