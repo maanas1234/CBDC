@@ -31,6 +31,31 @@ def _local_model(global_model, device):
     return model
 
 
+def train_local_selected(global_model, data, institution, train_mask, val_mask, device, epochs, lr, weight_decay):
+    """Train one institution alone and keep the epoch with the best F1 on its own validation nodes."""
+    from sklearn.metrics import f1_score
+    model = _local_model(global_model, device)
+    optimizer = torch.optim.Adam(model.parameters(), lr=lr, weight_decay=weight_decay)
+    ids = institution.node_ids
+    x, y, edge = data.x[ids].to(device), data.y[ids].to(device), institution.edge_index.to(device)
+    local_train, local_val = train_mask[ids].to(device), val_mask[ids].to(device)
+    best_state, best_f1 = {k: v.detach().cpu().clone() for k, v in model.state_dict().items()}, -1.0
+    if not int(local_train.sum()):
+        return best_state
+    has_positive_val = bool((y[local_val] == 1).any())
+    for _ in range(epochs):
+        model.train(); optimizer.zero_grad(set_to_none=True)
+        F.cross_entropy(model(x, edge)[local_train], y[local_train]).backward(); optimizer.step()
+        if not has_positive_val:
+            continue
+        model.eval()
+        with torch.no_grad(): prediction = model(x, edge)[local_val].argmax(1).cpu().numpy()
+        score = f1_score(y[local_val].cpu().numpy(), prediction, zero_division=0)
+        if score > best_f1:
+            best_f1, best_state = score, {k: v.detach().cpu().clone() for k, v in model.state_dict().items()}
+    return best_state if has_positive_val else {k: v.detach().cpu().clone() for k, v in model.state_dict().items()}
+
+
 def train_local(global_model, data, institution, train_mask, device, epochs, lr, weight_decay, foreign_embeddings=None, alignment_lambda=0.):
     model = _local_model(global_model, device)
     optimizer = torch.optim.Adam(model.parameters(), lr=lr, weight_decay=weight_decay)

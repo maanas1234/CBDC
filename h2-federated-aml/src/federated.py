@@ -7,7 +7,7 @@ from torch_geometric.data import Data
 from boundary import payload_lookup
 from data import device_from_config, set_seed
 from evaluate import evaluate_logits
-from model import GCN, train_local
+from model import GCN, train_local, train_local_selected
 from scarcity import apply_institutional_illicit_scarcity
 from privacy import privatize_model_update, privatize_boundary_payload
 
@@ -58,10 +58,14 @@ def _institutions_and_training(data, splits, k, partition_method, scarcity, seed
     return institutions, *apply_institutional_illicit_scarcity(splits["train"], data.y, institutions, scarcity, seed)
 
 
-def run_federated(data, splits, *, k=3, partition_method="graph_aware", seed=42, rounds=10, local_epochs=1, lr=.01, hidden_dim=64, device="auto", scarcity=1., boundary_lambda=0., privacy=None):
-    """Run weighted FedAvg, optionally adding label-free boundary alignment locally."""
+def run_federated(data, splits, *, k=3, partition_method="graph_aware", seed=42, rounds=10, local_epochs=1, lr=.01, hidden_dim=64, device="auto", scarcity=1., boundary_lambda=0., privacy=None, select_on_val=False):
+    """Run weighted FedAvg, optionally adding label-free boundary alignment locally.
+
+    With select_on_val, the global model from the round with the best validation F1 is evaluated.
+    """
     set_seed(seed); dev = device_from_config(device); institutions, train_mask, scarcity_counts = _institutions_and_training(data, splits, k, partition_method, scarcity, seed)
     model = GCN(data.num_node_features, hidden_dim).to(dev); foreign_embeddings = {}
+    best_f1, best_state, best_round = -1.0, None, 0
     privacy = privacy or {}; privacy_enabled = bool(privacy.get("enabled", False))
     noise_generator = torch.Generator().manual_seed(seed + 104729)
     for round_number in range(rounds):
@@ -76,17 +80,46 @@ def run_federated(data, splits, *, k=3, partition_method="graph_aware", seed=42,
             model.load_state_dict(fedavg([update[0] for update in updates], [update[1] for update in updates]))
             payloads = {institution.id: update[2] for institution, update in zip(institutions, updates)}
         foreign_embeddings = {} if boundary_lambda == 0 else payload_lookup(payloads)
+        if select_on_val:
+            model.eval()
+            with torch.no_grad(): validation = evaluate_logits(model(data.x.to(dev), data.edge_index.to(dev)).cpu(), data.y, splits["val"])
+            if validation["f1"] > best_f1: best_f1, best_round, best_state = validation["f1"], round_number + 1, {key: value.detach().cpu().clone() for key, value in model.state_dict().items()}
         print(f"Round {round_number + 1}/{rounds}: aggregated {sum(update[1] for update in updates)} labelled local samples")
+    if select_on_val and best_state is not None: model.load_state_dict(best_state)
     model.eval()
     with torch.no_grad(): logits = model(data.x.to(dev), data.edge_index.to(dev)).cpu()
-    return evaluate_logits(logits, data.y, splits["test"]), institutions, model.cpu(), train_mask, scarcity_counts
+    metrics = evaluate_logits(logits, data.y, splits["test"])
+    if select_on_val: metrics["best_round"] = best_round
+    return metrics, institutions, model.cpu(), train_mask, scarcity_counts
 
 
-def run_local_only(data, splits, *, k=3, partition_method="graph_aware", seed=42, epochs=10, lr=.01, hidden_dim=64, device="auto", scarcity=1.):
+def run_centralized_pooled(data, splits, *, k=3, partition_method="graph_aware", seed=42, epochs=200, lr=.01, hidden_dim=64, device="auto", scarcity=1., select_on_val=False):
+    """Pooled baseline on the exact scarce label mask the federated run would see (same labels, no data boundaries)."""
+    set_seed(seed); dev = device_from_config(device); institutions, train_mask, scarcity_counts = _institutions_and_training(data, splits, k, partition_method, scarcity, seed)
+    x, edge, y, mask = data.x.to(dev), data.edge_index.to(dev), data.y.to(dev), train_mask.to(dev)
+    model = GCN(data.num_node_features, hidden_dim).to(dev); optimizer = torch.optim.Adam(model.parameters(), lr=lr, weight_decay=5e-4)
+    best_f1, best_state, best_epoch = -1.0, None, 0
+    for epoch in range(epochs):
+        model.train(); optimizer.zero_grad(set_to_none=True)
+        torch.nn.functional.cross_entropy(model(x, edge)[mask], y[mask]).backward(); optimizer.step()
+        if select_on_val:
+            model.eval()
+            with torch.no_grad(): validation = evaluate_logits(model(x, edge).cpu(), data.y, splits["val"])
+            if validation["f1"] > best_f1: best_f1, best_epoch, best_state = validation["f1"], epoch + 1, {key: value.detach().cpu().clone() for key, value in model.state_dict().items()}
+    if select_on_val and best_state is not None: model.load_state_dict(best_state)
+    model.eval()
+    with torch.no_grad(): logits = model(x, edge).cpu()
+    metrics = evaluate_logits(logits, data.y, splits["test"])
+    if select_on_val: metrics["best_round"] = best_epoch
+    return metrics, institutions, train_mask, scarcity_counts
+
+
+def run_local_only(data, splits, *, k=3, partition_method="graph_aware", seed=42, epochs=10, lr=.01, hidden_dim=64, device="auto", scarcity=1., select_on_val=False):
     set_seed(seed); dev = device_from_config(device); institutions, train_mask, scarcity_counts = _institutions_and_training(data, splits, k, partition_method, scarcity, seed)
     initial_model = GCN(data.num_node_features, hidden_dim).to(dev); logits = torch.zeros((data.num_nodes, 2))
     for institution in institutions:
-        state, _, _ = train_local(initial_model, data, institution, train_mask, dev, epochs, lr, 5e-4)
+        if select_on_val: state = train_local_selected(initial_model, data, institution, train_mask, splits["val"], dev, epochs, lr, 5e-4)
+        else: state, _, _ = train_local(initial_model, data, institution, train_mask, dev, epochs, lr, 5e-4)
         local_model = GCN(data.num_node_features, hidden_dim, cached=True).to(dev); local_model.load_state_dict(state); local_model.eval()
         with torch.no_grad(): logits[institution.node_ids] = local_model(data.x[institution.node_ids].to(dev), institution.edge_index.to(dev)).cpu()
     return evaluate_logits(logits, data.y, splits["test"]), institutions, train_mask, scarcity_counts
