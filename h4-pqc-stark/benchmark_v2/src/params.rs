@@ -15,10 +15,26 @@ pub const SIS_ROWS: usize = 80;
 pub const AMOUNT_BITS: usize = 64;
 /// Ternary randomness coordinates.
 pub const N_RAND: usize = 448;
-/// Trace length for the PQ circuit (randomness occupies rows 1..=N_RAND).
-pub const PQ_TRACE_LEN: usize = 512;
 /// Row at which every accumulator must equal its commitment coordinate.
 pub const FINAL_ROW: usize = N_RAND + 1;
+
+/// Computation proven alongside (PQ) or without (classical) the SIS opening.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Workload {
+    /// 2x2 integer matrix product (the original H4 workload).
+    Matmul,
+    /// First dense layer of the H1 MLP: 165 inputs -> 32 outputs.
+    Dense,
+}
+
+impl Workload {
+    pub fn name(self) -> &'static str {
+        match self {
+            Workload::Matmul => "matmul_2x2",
+            Workload::Dense => "dense_165x32",
+        }
+    }
+}
 
 /// Matrix workload shared by both circuits.
 pub const MATRIX_A: [u64; 4] = [1, 2, 3, 4];

@@ -6,10 +6,10 @@ use winterfell::{
     TraceInfo, TraceTable, TransitionConstraintDegree,
 };
 
-use crate::params::{MATRIX_A, MATRIX_B, MATRIX_C};
+use crate::dense;
+use crate::params::{Workload, MATRIX_A, MATRIX_B, MATRIX_C};
 
 pub const TRACE_LEN: usize = 8;
-pub const WIDTH: usize = BLOCK_WIDTH;
 /// Matmul block width: A, B, C, OUT (16) plus a clock column so no trace is all-constant.
 pub const BLOCK_WIDTH: usize = 17;
 /// Number of transition constraints in the matmul block.
@@ -73,47 +73,114 @@ pub fn fill_matmul(columns: &mut [Vec<BaseElement>], base: usize, len: usize, ou
     }
 }
 
+/// Public statement: which workload, and (for the dense layer) the claimed outputs.
 #[derive(Clone)]
-pub struct NoInputs;
-impl Serializable for NoInputs {
-    fn write_into<W: ByteWriter>(&self, _target: &mut W) {}
+pub struct Claim {
+    pub workload: Workload,
+    pub dense_y: [u64; dense::OUT],
+}
+
+impl Serializable for Claim {
+    fn write_into<W: ByteWriter>(&self, target: &mut W) {
+        target.write_u8(self.workload as u8);
+        if self.workload == Workload::Dense {
+            let values: Vec<BaseElement> = self.dense_y.iter().map(|&v| BaseElement::from(v)).collect();
+            target.write(&values[..]);
+        }
+    }
+}
+
+pub fn trace_len(w: Workload) -> usize {
+    match w {
+        Workload::Matmul => TRACE_LEN,
+        Workload::Dense => dense::MIN_LEN.next_power_of_two(),
+    }
+}
+
+pub fn width(w: Workload) -> usize {
+    match w {
+        Workload::Matmul => BLOCK_WIDTH,
+        Workload::Dense => dense::WIDTH,
+    }
+}
+
+pub fn num_constraints(w: Workload) -> usize {
+    match w {
+        Workload::Matmul => BLOCK_CONSTRAINTS,
+        Workload::Dense => dense::CONSTRAINTS,
+    }
 }
 
 pub struct ClassicalAir {
     context: AirContext<BaseElement>,
+    claim: Claim,
+    len: usize,
 }
 
 impl Air for ClassicalAir {
     type BaseField = BaseElement;
-    type PublicInputs = NoInputs;
+    type PublicInputs = Claim;
 
-    fn new(trace_info: TraceInfo, _pub_inputs: NoInputs, options: ProofOptions) -> Self {
-        assert_eq!(trace_info.width(), WIDTH);
-        Self { context: AirContext::new(trace_info, matmul_degrees(), BLOCK_ASSERTIONS, options) }
+    fn new(trace_info: TraceInfo, claim: Claim, options: ProofOptions) -> Self {
+        let w = claim.workload;
+        assert_eq!(trace_info.width(), width(w));
+        let len = trace_info.length();
+        let (degrees, n_assert) = match w {
+            Workload::Matmul => (matmul_degrees(), BLOCK_ASSERTIONS),
+            Workload::Dense => (dense::degrees(len), dense::ASSERTIONS),
+        };
+        Self { context: AirContext::new(trace_info, degrees, n_assert, options), claim, len }
     }
 
     fn context(&self) -> &AirContext<BaseElement> {
         &self.context
     }
 
-    fn evaluate_transition<E: FieldElement + From<BaseElement>>(&self, frame: &EvaluationFrame<E>, _periodic: &[E], result: &mut [E]) {
-        matmul_constraints(frame.current(), frame.next(), 0, result);
+    fn evaluate_transition<E: FieldElement + From<BaseElement>>(&self, frame: &EvaluationFrame<E>, periodic: &[E], result: &mut [E]) {
+        match self.claim.workload {
+            Workload::Matmul => matmul_constraints(frame.current(), frame.next(), 0, result),
+            Workload::Dense => dense::constraints(frame.current(), frame.next(), periodic, 0, result),
+        }
     }
 
     fn get_assertions(&self) -> Vec<Assertion<BaseElement>> {
-        matmul_assertions(0)
+        match self.claim.workload {
+            Workload::Matmul => matmul_assertions(0),
+            Workload::Dense => dense::assertions(0, &self.claim.dense_y),
+        }
+    }
+
+    fn get_periodic_column_values(&self) -> Vec<Vec<BaseElement>> {
+        match self.claim.workload {
+            Workload::Matmul => Vec::new(),
+            Workload::Dense => dense::periodic_columns(self.len),
+        }
     }
 }
 
 pub struct ClassicalProver {
     pub options: ProofOptions,
+    pub workload: Workload,
     pub out_override: Option<[u64; 4]>,
+    pub dense_y: [u64; dense::OUT],
 }
 
 impl ClassicalProver {
+    pub fn new(options: ProofOptions, workload: Workload) -> Self {
+        Self { options, workload, out_override: None, dense_y: dense::output(&dense::input()) }
+    }
+
+    pub fn claim(&self) -> Claim {
+        Claim { workload: self.workload, dense_y: self.dense_y }
+    }
+
     pub fn build_trace(&self) -> TraceTable<BaseElement> {
-        let mut columns = vec![vec![BaseElement::ZERO; TRACE_LEN]; WIDTH];
-        fill_matmul(&mut columns, 0, TRACE_LEN, self.out_override);
+        let (w, len) = (width(self.workload), trace_len(self.workload));
+        let mut columns = vec![vec![BaseElement::ZERO; len]; w];
+        match self.workload {
+            Workload::Matmul => fill_matmul(&mut columns, 0, len, self.out_override),
+            Workload::Dense => dense::fill(&mut columns, 0, len, &dense::input()),
+        }
         TraceTable::init(columns)
     }
 }
@@ -123,8 +190,8 @@ impl Prover for ClassicalProver {
     type Air = ClassicalAir;
     type Trace = TraceTable<BaseElement>;
 
-    fn get_pub_inputs(&self, _trace: &Self::Trace) -> NoInputs {
-        NoInputs
+    fn get_pub_inputs(&self, _trace: &Self::Trace) -> Claim {
+        self.claim()
     }
 
     fn options(&self) -> &ProofOptions {

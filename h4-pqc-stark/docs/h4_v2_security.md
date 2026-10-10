@@ -59,6 +59,15 @@ Both circuits use the same options: sextic extension (138-bit field), blowup 8, 
 | Proof options | not specified (v1: ~11–17 bits) | identical secure options for both circuits |
 | **Overhead bounds** | **size ≤ 20×, prove ≤ 200×, verify ≤ 10×** | **unchanged** |
 
-Pass/fail rule: each metric passes if its mean PQ/classical ratio over the measured runs is within its bound. H4 overhead is confirmed only if all three pass. Workload stays a 2×2 matrix product; coverage of the H1–H3 model classes is a separate limitation and is not tested here.
+Pass/fail rule: each metric passes if its mean PQ/classical ratio over the measured runs is within its bound. H4 overhead is confirmed for a workload only if all three pass for that workload.
+
+### Workloads (second amendment, committed before any benchmark run)
+
+1. **`matmul_2x2` (primary).** The pre-registered workload: a 2×2 integer matrix product.
+2. **`dense_165x32` (coverage).** The first dense layer of the H1 MLP: 165 inputs → 32 outputs, public weights, private input, public outputs. This addresses the H1–H3 coverage limitation for the H1 model class at one layer. The ReLU and later layers are not proven, and the H2 GCN and H3 agents are not covered.
+
+The same bounds and pass/fail rule apply to each workload, reported separately. Values are pseudo-random fixed-point integers at H1's scale (2⁹). Prover and verifier cost depend on dimensions, not values.
+
+Measurement protocol: 3 warm-up runs, then 30 measured runs per system per workload, interleaving classical and PQ each run so machine-load drift affects both equally. Ratios use the mean over measured runs. Tests (`cargo test --release`) cover honest acceptance, lattice forgeries, and wrong workload outputs for both workloads.
 
 The bounds were committed on 2026-10-06. That predates v2 entirely, so the v2 result cannot have influenced them. The Oct 6 commit came after the v1 numbers, which is why PR #12 labeled them post-hoc for v1.
