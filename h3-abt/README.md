@@ -274,7 +274,7 @@ Config: `configs/experiment.yaml`, seed 42, n=20 per group, 50 steps (1000 actio
 - Verdict under the predefined rule: `SUPPORTED` (this configuration only).
 
 **Limitations of this test:**
-- Pseudo-replication: the z-test treats each action as independent. Actions from the same agent across 50 steps are not independent, so the p-value is overstated. Clustered standard errors (by agent) are needed before the p-value is reported as final.
+- Pseudo-replication: the z-test treats each action as independent. Actions from the same agent across 50 steps are not independent, so the action-level p-value is overstated. **Resolved by the agent-level re-analysis below.**
 - No minimum effect size was specified for H3 (the proposal sets only significance).
 
 **Majority-clean bar (post-hoc definition).** Owner's rule: with n agents, at least n/2 must pass. An agent **passes** if its violation rate over the run is at most 50%. This definition was chosen after the per-agent counts were viewed, so it is **post-hoc and exploratory**, not pre-registered. A strict "zero violations" reading was considered and rejected as too strict to be a useful bar; under it, 0 of 20 treatment agents pass.
@@ -282,9 +282,23 @@ Config: `configs/experiment.yaml`, seed 42, n=20 per group, 50 steps (1000 actio
 | Group | Agents passing (rate ≤ 50%) | Bar (n/2) | Majority bar met |
 |---|---|---|---|
 | Treatment (staked) | 19 / 20 | 10 | Yes |
-| Control (unstaked) | 6 / 20 | 10 | No |
+| Control (unstaked) | 7 / 20 | 10 | No |
 
 The majority bar is separate from the z-test verdict. Both are reported; neither replaces the other.
+
+**Agent-level re-analysis (unit = agent, n = 20 per group).** `python run_agent_level.py` writes `results/agent_level_seed42.json`. One violation rate per agent, one-sided tests, H1: staked agents violate less.
+
+| Test | Statistic | p (one-sided) |
+|---|---|---|
+| Mann–Whitney U (tie-corrected normal approx.) | U = 25.5, z = −4.73 | 1.1 × 10⁻⁶ |
+| Permutation test on mean rate (100,000 permutations, seed 42) | Δ mean = −0.223 | ≤ 1.0 × 10⁻⁵ (no permutation as extreme) |
+
+Deterrence holds at the correct unit of analysis. The earlier action-level p (3.7 × 10⁻²⁴) is overstated and should not be cited; cite the agent-level result.
+
+**H3 final verdict:**
+- Deterrence: **supported** (agent-level p ≈ 1 × 10⁻⁶; 41% relative reduction in violation rate; majority bar met by staked 19/20, not by control 7/20).
+- Sybil resistance: **fails** (`SYBIL_SUCCEEDED`, documented limitation).
+- Scope: one simulation configuration (seed 42, 20 agents × 50 steps per group), in-simulation registry, no on-chain contract.
 
 **Sybil probe:** `SYBIL_SUCCEEDED` (documented limitation, see section 8). Not part of the z-test verdict.
 
