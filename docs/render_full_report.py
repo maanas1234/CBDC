@@ -15,7 +15,8 @@ body = MarkdownIt("commonmark").enable("table").render(src)
 FIGS = [("Figure 1. H2 matched-recall test: test precision-recall per method (mean over 10 seeds); dots = default 0.5 threshold.", "h2-federated-aml/results/v2_scores/pr_curves.png"),
         ("Figure 2. H3 durable liability: violation rate over time per regime (200 agents each) and the registration-bond sweep.", "h3-abt/results/durable_figure.png"),
         ("Figure 3. H3 learning agents under imperfect detection (pre-registered study).", "h3-abt/results/learning_figure.png"),
-        ("Figure 4. H4 overhead law: PQ/classical ratio vs classical cost across v3 workloads.", "h4-pqc-stark/benchmark_v2/results/overhead_law.png")]
+        ("Figure 4. H4 overhead law: PQ/classical ratio vs classical cost across v3 workloads.", "h4-pqc-stark/benchmark_v2/results/overhead_law.png"),
+        ("Figure 5. Memory-budgeted decomposition (§6B): measured peak memory of each plan against the prover node's budget.", "h1-zkopml-v2/results/memory_plans.png")]
 figs = "".join(
     f'<figure><img src="data:image/png;base64,{base64.b64encode((ROOT / p).read_bytes()).decode()}"/><figcaption>{c}</figcaption></figure>'
     for c, p in FIGS if (ROOT / p).exists())

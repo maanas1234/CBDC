@@ -169,6 +169,12 @@ python run_pipeline.py --n 1000 --source elliptic --data /path/to/elliptic_bitco
 The chain keys in `chain/networkFiles/` are generated locally and are not committed. The funded
 accounts are the well-known Anvil/Hardhat development keys: lab use only.
 
+## Hardware integration (28 Oct 2026)
+
+- [`hw_identity/`](hw_identity/README.md): the H3 operator identity anchored in a TPM 2.0 (EK certificate, credential activation, attested agent registration with a monotonic counter); prototype with software TPMs, 9 of 9 attacks refused.
+- [`embodiments/`](embodiments/README.md): simulated verify-then-sign trusted execution environment for validators, and offline payment devices with a secure element.
+- The memory-budgeted decomposition of the H1 model is in `h1-zkopml-v2/memory_planner.py`. All of it is summarised in §6B of `docs/FULL_REPORT.md` and Part 6B of `docs/EXHAUSTIVE_REPORT.md`.
+
 ## Limits (what this is not yet)
 
 - One machine, loopback network; no geographic distribution, no adversarial network delays.

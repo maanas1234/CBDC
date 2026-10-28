@@ -3,7 +3,7 @@
 **Repository:** github.com/maanas1234/CBDC (`main`)
 **Team:** Aman Hooda (H1), Indrakshi (H2), Anjali (H3), Simran Pundir (H4). Mentor and reviewer: Maanas Tyagi.
 **Source proposal:** *Architecting a Secure, Compliant, and Intelligent CBDC Ecosystem* (`docs/CBDC_AI_Blockchain_Research_Proposal.pdf`)
-**Updated:** 21 Oct 2026 (includes Aman's integration work, PRs #36–#39).
+**Updated:** 28 Oct 2026 (includes Aman's integration work, PRs #36–#39, and the hardware integration, Part 6B, PR #43).
 **Companion summary:** `docs/FULL_REPORT.md` (short version). This document is the long version.
 
 ---
@@ -61,6 +61,7 @@ Rebuilding twice in a row on the same checkout and environment gives a byte-iden
 | 5 | H4: post-quantum ZK-STARK (v1 prototypes, halt, v2, v3, model coverage, composed proof, overhead law) |
 | 6 | Cross-cutting findings and the system picture |
 | 6A | The integrated system (TRL 4): Besu pipeline, on-chain disputes and registry, Plonky3 proof, independent-validator run, and what was independently verified |
+| 6B | Hardware integration (after the faculty review): machine resources, memory-budgeted decomposition, TPM-anchored identity, simulated TEE and offline devices |
 | 7 | Corrections, deviations, withdrawn work, and what was not done |
 | 8 | Reproducibility and the full artifact index |
 | Appendices | Configurations, pre-registrations and original documentation, verbatim |

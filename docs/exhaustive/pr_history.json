@@ -1,1 +1,635 @@
-[{"author":{"id":"U_kgDOCaI0xQ","is_bot":false,"login":"amanhooda2005","name":""},"body":"Answers the review comment \"All four validator keys are yours.\"\n\nThe run was split across two people and two machines, connected over Tailscale:\n- **Host** (a person outside the team, his own MacBook): the 4-node QBFT network, the contract deployment, three validators and the 200 transfers.\n- **Reviewer** (Aman, his own MacBook Air): a separate Besu node synced from the host's network, and the fourth validator. Its key was generated on that machine and never shared, and it used its own build of the proof verifier.\n\nThe `SettlementGate` was deployed with `--threshold 4`, so neither person could settle anything alone.\n\n### Result: 200 real Elliptic transfers, 34 deliberately falsified\n- The fourth validator signed exactly the 166 honest transfers and refused all 34 falsified ones. Each refusal gave the matching reason:\n\n  | Falsification | Count |\n  |---|---|\n  | wrong model | 10 |\n  | amount swap | 8 |\n  | stale penalty | 6 |\n  | corrupted proof | 6 |\n  | flipped verdict | 4 |\n\n- The ledger holds exactly those 166 settlements, each with 4 signatures. No falsified request reached the quorum.\n- The reviewer's three checks against his own copy of the ledger (`check_my_validator.py`) are all `true`.\n- The host's three validators saw the same 200 request ids and made the same sign/refuse decision on every one.\n- In a first attempt, the fourth validator could not be reached and nothing settled (0 of 200).\n\n### Files\n- `integration/evidence/independent_validator/`:\n  - `reviewer/`: the fourth validator's decisions, its own-ledger check, and the machine and version details;\n  - `host/`: run records and the three host validators' decision logs, for both attempts;\n  - `cross_check.py` → `cross_check.json`: reconciles the two sides (standard library only), result `\"all_ok\": true`;\n  - `README.md`: summary.\n- Linked from `docs/EVIDENCE.md`, `docs/INDEPENDENT_VALIDATOR.md` and `README.md`.\n\nNo private keys are included.\n\n**To check:** `cd integration/evidence/independent_validator && python3 cross_check.py`","createdAt":"2026-10-20T19:33:26Z","headRefName":"aman/independent-validator-result","mergedAt":"2026-10-21T05:00:28Z","number":39,"state":"MERGED","title":"Evidence: independent-validator run on two machines (4-of-4 gate)"},{"author":{"id":"U_kgDOCaI0xQ","is_bot":false,"login":"amanhooda2005","name":""},"body":"Adds the audit script, EVIDENCE.md, logs and the exported ledger (missed from #37). Addresses review comments: the shared‑verifier dispute proof is no faster than the whole‑model proof (same‑machine numbers in the H1 README); the dispute record now replays with any Foundry version (tested with 1.5.1 and 1.8.5); Besu versions and node‑key setup for Docker; why EXHAUSTIVE_REPORT changes on rebuild (now reproducible); the weaker quantum estimate of the Plonky3 proof. Adds tooling and a guide for running one validator on an independent machine.","createdAt":"2026-10-20T16:52:45Z","headRefName":"aman/trl4-evidence","mergedAt":"2026-10-20T17:32:56Z","number":38,"state":"MERGED","title":"Evidence, reproducibility fixes and independent-validator setup"},{"author":{"id":"U_kgDOCaI0xQ","is_bot":false,"login":"amanhooda2005","name":""},"body":"## What this adds\n- **Integration (`integration/`)**: 4-validator Hyperledger Besu QBFT chain, validator attestation services (native proof verification, 3-of-4 quorum), SettlementGate contract, H3 LiabilityRegistry on-chain, end-to-end pipeline with fault injection.\n- **H1 v2 / v2.1**: hardened dispute contract (on-chain adjudication, prefix-consistency check, bonds, timeouts, per-challenger disputes); complete on-chain games with real EZKL step verifiers; one shared verifier per step shape (4 instead of 63, 17.2M vs ~251M deploy gas).\n- **H3**: on-chain LiabilityRegistry (9 tests) and a pre-registered learning-agent study under imperfect detection (pre-registration committed before the run).\n- **H4 v4/v4.1**: composed proof re-implemented on Plonky3 with zero-knowledge hiding; end-to-end security estimate (124-bit conjectured / 111-bit proven classical, ~62-bit quantum, conservative).\n- Docs: README \"Integrated system (TRL 4)\" section, FULL_REPORT §6A, integration/README.\n\n## Results\n| Run | Honest settled as required | Faulty reaching quorum / changing ledger |\n|---|---|---|\n| 1,000 real Elliptic test-period tx | 889 / 889 (4/4 signatures) | 0 / 111 · 0 |\n| 300 synthetic, 1 Byzantine validator | 244 / 244 | 0 / 56 · 0 |\n| 60 synthetic, 2 Byzantine | 26 / 26 | 0 / 34 · 0 |\n| 40 synthetic, 1 crashed validator | 25 / 25 | 0 / 15 · 0 |\n\n- End to end 1.98 s per transfer; settle gas 84k–108k.\n- H1 in-proof risk flag on Elliptic: precision 0.53, recall 0.72 (0 recall after time step 43, the known post-shutdown collapse).\n- H1 on-chain disputes: 7/7 scenarios correct on two real Elliptic transactions; dispute 1.58–1.91M gas; 10x target holds below a 0.8% dispute rate.\n- H3 learning study: all 4 primary tests supported (Holm p ≤ 3.2e-7).\n- H4: PQ binding under ZK costs 1.07x size, 1.10x prove.\n\n## Defects found by integration (fixed, with regression tests)\n1. The composed proof became incomplete once the H3 slash escalated (22-bit comparison window; now 30-bit with a stated domain).\n2. The proven rule could never execute a compliant transfer; the gate now slashes only attempted violations.\n\n## Tests\nFoundry: H1 17, H3 9, integration 6 · pytest: H1 66, H3 99 · cargo: H4 17 — all passing.","createdAt":"2026-10-15T10:52:16Z","headRefName":"aman/trl4-integration","mergedAt":"2026-10-15T12:32:15Z","number":37,"state":"MERGED","title":"TRL 4: integrated CBDC pipeline on Besu QBFT, real EZKL dispute verifiers, ZK composed proof, on-chain H3 registry"},{"author":{"id":"U_kgDOCaI0xQ","is_bot":false,"login":"amanhooda2005","name":""},"body":"## What this adds\n- **Integration (`integration/`)**: 4-validator Hyperledger Besu QBFT chain, validator attestation services (native proof verification, 3-of-4 quorum), SettlementGate contract, H3 LiabilityRegistry on-chain, end-to-end pipeline with fault injection.\n- **H1 v2 / v2.1**: hardened dispute contract (on-chain adjudication, prefix-consistency check, bonds, timeouts, per-challenger disputes); complete on-chain games with real EZKL step verifiers; one shared verifier per step shape (4 instead of 63, 17.2M vs ~251M deploy gas).\n- **H3**: on-chain LiabilityRegistry (9 tests) and a pre-registered learning-agent study under imperfect detection (pre-registration committed before the run).\n- **H4 v4/v4.1**: composed proof re-implemented on Plonky3 with zero-knowledge hiding; end-to-end security estimate (124-bit conjectured / 111-bit proven classical, ~62-bit quantum, conservative).\n- Docs: README \"Integrated system (TRL 4)\" section, FULL_REPORT §6A, integration/README.\n\n## Results\n| Run | Honest settled as required | Faulty reaching quorum / changing ledger |\n|---|---|---|\n| 1,000 real Elliptic test-period tx | 889 / 889 (4/4 signatures) | 0 / 111 · 0 |\n| 300 synthetic, 1 Byzantine validator | 244 / 244 | 0 / 56 · 0 |\n| 60 synthetic, 2 Byzantine | 26 / 26 | 0 / 34 · 0 |\n| 40 synthetic, 1 crashed validator | 25 / 25 | 0 / 15 · 0 |\n\n- End to end 1.98 s per transfer; settle gas 84k–108k.\n- H1 in-proof risk flag on Elliptic: precision 0.53, recall 0.72 (0 recall after time step 43, the known post-shutdown collapse).\n- H1 on-chain disputes: 7/7 scenarios correct on two real Elliptic transactions; dispute 1.58–1.91M gas; 10x target holds below a 0.8% dispute rate.\n- H3 learning study: all 4 primary tests supported (Holm p ≤ 3.2e-7).\n- H4: PQ binding under ZK costs 1.07x size, 1.10x prove.\n\n## Defects found by integration (fixed, with regression tests)\n1. The composed proof became incomplete once the H3 slash escalated (22-bit comparison window; now 30-bit with a stated domain).\n2. The proven rule could never execute a compliant transfer; the gate now slashes only attempted violations.\n\n## Tests\nFoundry: H1 17, H3 9, integration 6 · pytest: H1 66, H3 99 · cargo: H4 17 — all passing.\n","createdAt":"2026-10-15T10:25:15Z","headRefName":"aman/trl4-integration","mergedAt":null,"number":36,"state":"CLOSED","title":"TRL 4: integrated CBDC pipeline on Besu QBFT, real EZKL dispute verifiers, ZK composed proof, on-chain H3 registry"},{"author":{"id":"U_kgDOCsvrOA","is_bot":false,"login":"maanas1234","name":"Maanas Tyagi "},"body":"118-page exhaustive record. Tables are generated from the committed result files by `docs/exhaustive/build.py` (no retyped numbers); narrative in `docs/exhaustive/sections/`.\n\nCovers every version incl. withdrawn/superseded (H1 v1 recovered from git, H2 v1 single/5-seed, H4 v1 + halted pre-reg + closed PR #18), every per-seed and per-run table, all 34 PRs, corrections log (25 entries), provenance gaps, proposal items not attempted, verbatim configs/pre-registrations/original docs.\n\nAlso: force-adds H3 durable outputs that .gitignore had excluded; fixes composed-proof PQ width 219 -> 220 in FULL_REPORT.\n\n🤖 Generated with [Claude Code](https://claude.com/claude-code)","createdAt":"2026-10-13T06:21:42Z","headRefName":"maanas/exhaustive-report","mergedAt":"2026-10-13T06:21:46Z","number":35,"state":"MERGED","title":"Exhaustive record of every experiment (docs/EXHAUSTIVE_REPORT.md)"},{"author":{"id":"U_kgDOCsvrOA","is_bot":false,"login":"maanas1234","name":"Maanas Tyagi "},"body":"Complete write-up of H1-H4 plus findings C1-C5: methods, every result table, verdicts vs pre-registered criteria, limitations, threats to validity, reproducibility index. README results table and handoff updated with H3 Finding C (#33).\n\n🤖 Generated with [Claude Code](https://claude.com/claude-code)","createdAt":"2026-10-13T05:42:59Z","headRefName":"maanas/full-report","mergedAt":"2026-10-13T05:43:03Z","number":34,"state":"MERGED","title":"Full end-to-end results report (docs/FULL_REPORT.md)"},{"author":{"id":"U_kgDOCsvrOA","is_bot":false,"login":"maanas1234","name":"Maanas Tyagi "},"body":"Pre-registered in h3-abt/docs/PREREGISTRATION_durable.md (commit d08e0ff) before running seeds 43-52.\n\n- Wear-out: flat ABT violation rate rises 19% -> 45% (steps 1-10 vs 41-50) as 180/200 agents are slashed to zero; control 50%.\n- T1 stake maintenance < flat (late window): 18.4% vs 45.2%, z=-13.1. Supported.\n- T2 operator-bound escalation < id-keyed escalation with free resets: 2.0% vs 19.6%, z=-18.5. Supported. Free resets (1,757) erase escalation exactly.\n- Bond sweep: analytic break-even B*=14 -> zero resets at B>=14, matches exactly.\n- Tests reproduce the confirmatory seed-42 counts (542/319).\n\n🤖 Generated with [Claude Code](https://claude.com/claude-code)","createdAt":"2026-10-13T05:38:49Z","headRefName":"maanas/h3-durable-liability","mergedAt":"2026-10-13T05:38:54Z","number":33,"state":"MERGED","title":"H3 Finding C: deterrence wears out; stake maintenance + operator-bound history fix it (pre-registered)"},{"author":{"id":"U_kgDOCsvrOA","is_bot":false,"login":"maanas1234","name":"Maanas Tyagi "},"body":"Docs only. Summarizes PRs #29-#31 in the top-level README and refreshes docs/NEXT_SESSION.md.\n\n🤖 Generated with [Claude Code](https://claude.com/claude-code)","createdAt":"2026-10-11T13:26:17Z","headRefName":"maanas/final-findings","mergedAt":"2026-10-11T13:26:21Z","number":32,"state":"MERGED","title":"README: cross-cutting findings (composed PQ proof, gameable FP criterion, overhead law); handoff refresh"},{"author":{"id":"U_kgDOCsvrOA","is_bot":false,"login":"maanas1234","name":"Maanas Tyagi "},"body":"Pre-registered in h4-pqc-stark/docs/h4_composed.md (commit 22909fa, before timing).\n\n- One STARK: full trained H1 inference (private logit) -> risk flag -> H3 decision with risk as violation condition -> rule amount bound to the SIS-committed amount bits.\n- Narrow single-decision rule (register columns + shared 22-bit window) to fit 255 columns; amount link in rlc.rs.\n- 20/20 tests: forged risk flag, wrong outputs, uncommitted amount (classical accepts, PQ rejects), high committed bits, mid-trace register change all rejected.\n- 30 runs: **PASS** — size 1.15x, prove 1.28x, verify 1.77x (bounds 20x/200x/10x). Overhead law predicted 1.14x/1.26x/1.61x.\n\n🤖 Generated with [Claude Code](https://claude.com/claude-code)","createdAt":"2026-10-11T13:25:22Z","headRefName":"maanas/h4-composed","mergedAt":"2026-10-11T13:25:26Z","number":31,"state":"MERGED","title":"H4 Finding A: one PQ proof for a whole transaction decision (H1 -> risk -> H3 -> committed amount)"},{"author":{"id":"U_kgDOCsvrOA","is_bot":false,"login":"maanas1234","name":"Maanas Tyagi "},"body":"Pre-registered in experiments/PREREGISTRATION_matched_recall.md (commit 107ace1, before the rerun).\n\n- Rerun of main_scarcity, 10 seeds, per-node scores saved; FPs identical to v2 in 240/240 cases.\n- At matched validation recall, the v2 criterion (>=20% fewer FPs, Holm p<0.05) **fails at all 5 fully evaluable levels** -> Finding B supported.\n- 50-100% labels: FedAvg has 67-80% *more* FPs at equal recall (two-sided Holm p 0.012, 0.049).\n- Exception reported: 10% labels, FedAvg 80% fewer FPs at matched recall, Holm p 0.070 (n.s.).\n- 1% level: only 5/10 seeds evaluable (centralized val recall 0), excluded per pre-registration.\n\n🤖 Generated with [Claude Code](https://claude.com/claude-code)","createdAt":"2026-10-11T13:24:47Z","headRefName":"maanas/h2-matched-recall","mergedAt":"2026-10-11T13:24:51Z","number":30,"state":"MERGED","title":"H2 Finding B: FP criterion is gameable — matched-recall test (pre-registered)"},{"author":{"id":"U_kgDOCsvrOA","is_bot":false,"login":"maanas1234","name":"Maanas Tyagi "},"body":"Fits PQ = classical + c over the five measured v3 workloads (2x2, dense, full H1 MLP, H2 GCN, H3 rule).\n\n- Verify +12 ms, prove +28 ms, size +8.4 KB (2x2 excepted: trace padded 8 to 128 rows).\n- Ratio = 1 + c/classical, so PQ binding is cheapest for real-sized models.\n- Labeled post-hoc / descriptive. Script, md, csv and png in `h4-pqc-stark/benchmark_v2`.\n\n🤖 Generated with [Claude Code](https://claude.com/claude-code)","createdAt":"2026-10-11T07:15:24Z","headRefName":"maanas/h4-overhead-law","mergedAt":"2026-10-11T07:15:27Z","number":29,"state":"MERGED","title":"H4: post-hoc overhead law (no new runs)"},{"author":{"id":"U_kgDOCsvrOA","is_bot":false,"login":"maanas1234","name":"Maanas Tyagi "},"body":"Adds docs/NEXT_SESSION.md: current verdicts, two proposed paper findings with concrete plans (one composed PQ proof for a full CBDC transaction decision; a calibration-controlled matched-recall test showing FP criteria in federated AML are gameable), a cheap overhead-law analysis, and practical notes. Also updates two H2 README passages that still said there was no privacy accountant (protocol v2 added one) and that the original criterion was untested (it was, in v2).\n\n🤖 Generated with [Claude Code](https://claude.com/claude-code)","createdAt":"2026-10-11T07:11:32Z","headRefName":"maanas/handoff-next-session","mergedAt":"2026-10-11T07:11:36Z","number":28,"state":"MERGED","title":"docs: next-session handoff and stale H2 note fixes"},{"author":{"id":"U_kgDOCsvrOA","is_bot":false,"login":"maanas1234","name":"Maanas Tyagi "},"body":"Closes the last open H4 limitation: coverage of the model classes used in H1-H3.\n\n**What is proven (exact integer inference, not timing stand-ins):**\n- H1: the trained W32_B1 model, all layers (projection + ReLU, residual block + ReLU, head), on a real illicit test transaction.\n- H2: the trained centralized GCN (166->64->2) prediction for Elliptic node 36333 over its real 3-node receptive field.\n- H3: choose_action + is_violation for 64 real decisions of the staked treatment run.\n\n**Soundness:** private inputs range-checked; every requantization and ReLU proven with unique decompositions (windows <= 2^22 < p); interval bounds rule out field wrap-around. 16/16 tests, including rejection of wrong outputs, out-of-range inputs that match their claimed output, tampered quotients, forged ReLU outputs and forged violation flags.\n\n**Fidelity (test splits):** H1 F1 0.505 vs float 0.512 (99.5% agreement); H2 F1 0.732 vs 0.743 (99.0%), with a declared 0.1-99.9 percentile feature clip chosen on validation; H3 100% over 1,000 decisions.\n\n**Pre-registered** (docs/h4_coverage.md) before any coverage timing. **Results (30 runs, v3 vs classical):**\n| Workload | Size | Prove | Verify | Verdict |\n|---|---|---|---|---|\n| H1 full MLP | 1.18x | 1.28x | 1.92x | PASS |\n| H2 GCN node | 1.13x | 1.36x | 1.76x | PASS |\n| H3 rule x64 | 1.20x | 1.51x | 1.96x | PASS |\n\nQuantization scripts in h4-pqc-stark/coverage/ (data from the PyG Elliptic mirror, not committed).\n\n🤖 Generated with [Claude Code](https://claude.com/claude-code)","createdAt":"2026-10-11T07:08:45Z","headRefName":"maanas/h4-model-coverage","mergedAt":"2026-10-11T07:08:49Z","number":27,"state":"MERGED","title":"H4: prove full H1 MLP, H2 GCN, and H3 rule inference; overhead within bounds"},{"author":{"id":"U_kgDOCsvrOA","is_bot":false,"login":"maanas1234","name":"Maanas Tyagi "},"body":"Continues H4 after v2 missed the 2x2 verify bound (14.1x > 10x). v2's verdict is kept as recorded.\n\n**Diagnosis:** instrumented the Winterfell verifier. In v2, DEEP composition over the 80 accumulator columns was ~15 ms of ~19 ms verify.\n\n**v3 (same statement):** identical commitment (same uniform matrix, n=80; a test asserts it). s packed 4 per row; after s is committed, gamma is drawn from F_{p^6} and one auxiliary accumulator checks sum_j gamma^j (A_j s - c_j) = 0. Extra soundness error <= 2^-130.5 (Schwartz-Zippel). Binding unchanged (statistical).\n\n**Process:** v3 design, tests and pre-registration (docs/h4_v3.md, incl. disclosure of the exploratory dev timings) committed before the confirmatory run; bounds and protocol unchanged.\n\n**Confirmatory results (30 runs):**\n| Workload | Size | Prove | Verify | Verdict |\n|---|---|---|---|---|\n| 2x2 matmul | 4.97x | 14.2x | 7.40x | PASS |\n| H1 dense 165x32 | 1.23x | 2.58x | 3.45x | PASS |\n\nTests: 10/10 (v2 and v3), including direct AIR checks with three gamma values and forgery rejection.\n\n🤖 Generated with [Claude Code](https://claude.com/claude-code)","createdAt":"2026-10-11T06:30:10Z","headRefName":"maanas/h4-v3-rlc","mergedAt":"2026-10-11T06:30:14Z","number":26,"state":"MERGED","title":"H4 v3: random-linear-combination proof; passes all bounds"},{"author":{"id":"U_kgDOCsvrOA","is_bot":false,"login":"maanas1234","name":"Maanas Tyagi "},"body":"Moves helpers used only by tests (num_constraints, CONSTRAINTS, BLOCK_CONSTRAINTS) under cfg(test). Release build now has zero warnings; all tests pass. No behavior change.\n\n🤖 Generated with [Claude Code](https://claude.com/claude-code)","createdAt":"2026-10-11T05:57:05Z","headRefName":"maanas/h4-clean-warnings","mergedAt":"2026-10-11T05:57:09Z","number":25,"state":"MERGED","title":"chore(h4): warning-free build"},{"author":{"id":"U_kgDOCsvrOA","is_bot":false,"login":"maanas1234","name":"Maanas Tyagi "},"body":"Replaces the root-Hermite heuristic with a real lattice-estimator run (malb/lattice-estimator 53da598, official SageMath image).\n\n- v2 (n=80, m=512, q=7,340,033, inf-norm <= 2): best attack BKZ-507..511, log2 cost 615 (ChaLoy21 quantum) to 705 (MATZOV).\n- L2 formulation: no feasible attack.\n- Counting argument: ~2^-636 expected short collisions for a random matrix, so binding is statistical.\n- v1 parameters: estimator internal error, recorded as such (v1 already withdrawn).\n\nScript and raw JSON added under h4-pqc-stark/docs/.\n\n🤖 Generated with [Claude Code](https://claude.com/claude-code)","createdAt":"2026-10-11T05:54:02Z","headRefName":"maanas/h4-lattice-estimator","mergedAt":"2026-10-11T05:54:05Z","number":24,"state":"MERGED","title":"docs(h4): lattice-estimator security result for v2 parameters"},{"author":{"id":"U_kgDOCsvrOA","is_bot":false,"login":"maanas1234","name":"Maanas Tyagi "},"body":"Adds a Final Results section to the top-level README with the verdict, key numbers and main caveat for each hypothesis, and fixes the H2 target line (the proposal compares against a centralized baseline, not a single bank).\n\n🤖 Generated with [Claude Code](https://claude.com/claude-code)","createdAt":"2026-10-11T05:34:32Z","headRefName":"maanas/final-readme","mergedAt":"2026-10-11T05:34:35Z","number":23,"state":"MERGED","title":"docs: final results for H1-H4"},{"author":{"id":"U_kgDOCsvrOA","is_bot":false,"login":"maanas1234","name":"Maanas Tyagi "},"body":"Completes H2.\n\n**Protocol** (pre-registered in experiments/PREREGISTRATION_v2.md before any run): 10 seeds, matched 200-epoch budget, validation checkpoint selection for all methods, pooled centralized baseline on the identical scarce label mask, false-positive primary test (one-sided Wilcoxon, Holm), institution-level DP sweep with RDP accounting.\n\n**Why v2:** v1 used 5 seeds (a paired two-sided Wilcoxon cannot reach p<0.05), unequal training budgets, and no centralized comparison under scarcity.\n\n**Results:**\n- Primary FP criterion: met at all 6 levels (45-99.9% fewer FP, Holm p<=0.031).\n- But FedAvg F1 is significantly lower than centralized at every level (-0.07 to -0.19), with much lower recall; PR-AUC significantly lower at 50-100% labels. The FP reduction comes from flagging less, not better detection.\n- Refined H2 (boundary channel): not supported; lowers F1 at 5/6 levels.\n- DP: epsilon ~50 drops F1 0.65 -> 0.29; settings that keep utility have epsilon >= 2e5.\n\nData placed locally from the PyG Elliptic mirror (gitignored, not committed).\n\n🤖 Generated with [Claude Code](https://claude.com/claude-code)","createdAt":"2026-10-11T05:33:41Z","headRefName":"maanas/h2-protocol-v2","mergedAt":"2026-10-11T05:33:48Z","number":22,"state":"MERGED","title":"H2 protocol v2: pre-registered 10-seed study, pooled centralized baseline, DP"},{"author":{"id":"U_kgDOCsvrOA","is_bot":false,"login":"maanas1234","name":"Maanas Tyagi "},"body":"Replaces the unsound v1 H4 circuit and reports final results.\n\n**Why v1 is withdrawn:** prover-controlled SIS matrix and selectors, wrong modulus with a free quotient, no range checks, and ~11-17 bits of STARK security on both classical and PQ sides.\n\n**v2:** SIS opening over the native field (q = p = 7,340,033); B and selectors as verifier-computed periodic columns; boolean amount bits and exactly-ternary r. SIS estimate beyond full-dimension BKZ (>136 bits quantum, heuristic). Identical secure proof options for both circuits (125-128 bits conjectured). Tests evaluate the AIR directly and reject every forgery attempt; end-to-end prove/verify tests pass.\n\nPre-registration amendments (parameters, workloads, analysis script) were committed before any benchmark run; overhead bounds are unchanged from 2026-10-06.\n\n**Results (30 runs, idle machine):**\n| Workload | Size | Prove | Verify | Verdict |\n|---|---|---|---|---|\n| 2x2 matmul (primary) | 9.1x | 71.5x | **14.1x** | FAIL (verify > 10x) |\n| H1 dense 165x32 | 1.9x | 9.9x | 4.4x | PASS |\n\nThe lattice opening adds a roughly fixed verify cost (~18 ms), so overhead is bounded for a realistic ML layer but not for a trivial computation.\n\n🤖 Generated with [Claude Code](https://claude.com/claude-code)","createdAt":"2026-10-11T05:30:43Z","headRefName":"maanas/h4-sound-v2","mergedAt":"2026-10-11T05:30:51Z","number":21,"state":"MERGED","title":"H4 v2: sound SIS-STARK circuit, secure options, final benchmark"},{"author":{"id":"U_kgDOCsvrOA","is_bot":false,"login":"maanas1234","name":"Maanas Tyagi "},"body":"Resolves the pseudo-replication caveat in H3. The action-level z-test (p=3.7e-24) treats 1,000 correlated actions per group as independent.\n\nAgent-level re-analysis of the committed confirmatory run (n=20 agents per group, one rate per agent, one-sided):\n- Mann-Whitney U = 25.5, z = -4.73, p = 1.1e-6\n- Permutation test on mean rate (100k, seed 42): p <= 1e-5\n\nDeterrence holds at the correct unit of analysis. Also fixes a transcription error: control majority bar is 7/20, not 6/20.\n\nFinal H3 verdict: deterrence supported; Sybil resistance fails (documented).\n\nStdlib only, 5 new tests, full H3 suite passes (87).\n\n🤖 Generated with [Claude Code](https://claude.com/claude-code)","createdAt":"2026-10-10T19:24:21Z","headRefName":"maanas/h3-agent-level-test","mergedAt":"2026-10-10T19:24:31Z","number":20,"state":"MERGED","title":"feat(h3): agent-level re-analysis and final verdict"},{"author":{"id":"U_kgDOEdWoow","is_bot":false,"login":"indrakshi2006-boop","name":"Indrakshi"},"body":"","createdAt":"2026-10-09T20:32:45Z","headRefName":"h2-federated-aml-ii","mergedAt":"2026-10-10T18:42:56Z","number":19,"state":"MERGED","title":"Complete H2 multi-seed and privacy experiments"},{"author":{"id":"U_kgDOB0Ytew","is_bot":false,"login":"simranpundirr","name":"Simran Pundir"},"body":"## Summary\r\n\r\nCorrects the H4 PQ-STARK commitment-binding circuit and records the\r\nmatched classical/PQ benchmark after the fix.\r\n\r\n### Validation\r\n\r\n- Commitment-binding negative test: PASS\r\n- Debug test: PASS\r\n- Release test: PASS\r\n- PQ benchmark: 10/10 successful\r\n- Classical benchmark: 10/10 successful\r\n\r\n### Results\r\n\r\n| Metric | Classical | PQ | Overhead |\r\n|---|---:|---:|---:|\r\n| Proof size | 2,233 B | 33,214 B | 14.87× |\r\n| Proving time | 0.3402 ms | 68.7434 ms | 202.05× |\r\n| Verification time | 0.1584 ms | 1.1353 ms | 7.17× |\r\n\r\nPre-registered feasibility bounds:\r\n- Proof size ≤ 20× → PASS\r\n- Verification latency ≤ 10× → PASS\r\n\r\nThe ~202× proving overhead is reported explicitly.\r\n\r\n### Limitations\r\n\r\nThis establishes a feasibility/performance result for the corrected\r\nresearch-candidate prototype on the evaluated 2×2 matrix workload.\r\n\r\nIt does not establish production-grade PQ security, a NIST security\r\nlevel, or end-to-end ZKML performance for the full H1–H3 model classes.\r\nConcrete SIS security analysis and broader model coverage remain future work.","createdAt":"2026-10-07T00:38:48Z","headRefName":"simran/h4-production-params","mergedAt":null,"number":18,"state":"CLOSED","title":"Validate H4 PQ-STARK matched benchmark"},{"author":{"id":"U_kgDOCsvrOA","is_bot":false,"login":"maanas1234","name":"Maanas Tyagi "},"body":"Implements the H2 privacy and baseline pieces that were missing.\n\n- **DP (client-level, opt-in):** clip each institution's update, Gaussian noise, RDP accounting for full participation. Guarantee protects an institution, not an individual transaction. Per-record DP is not claimed.\n- **Centralized under scarcity:** `--scarcity` flag on the centralized baseline, for the comparison the original H2 criterion needs.\n- Default federated behavior is unchanged.\n- Unit tests pass (5/5). **Not yet run on the Elliptic data**, which is not on this machine. Sanity: T=10, z=1, delta=1e-5 gives eps=20.2, so a meaningful privacy level needs a much larger noise multiplier.\n\n🤖 Generated with [Claude Code](https://claude.com/claude-code)","createdAt":"2026-10-06T16:34:39Z","headRefName":"maanas/h2-dp-fedavg","mergedAt":null,"number":17,"state":"CLOSED","title":"feat(h2): client-level DP-FedAvg and centralized scarcity option"},{"author":{"id":"U_kgDOCsvrOA","is_bot":false,"login":"maanas1234","name":"Maanas Tyagi "},"body":"Pre-registers SIS parameters (M=576, N=1152, q and beta unchanged) for a 128-bit post-quantum target (quantum core-SVP heuristic ~138 bits), reusing the bounds from PR #12.\n\n**The confirmatory run is halted.** Inspecting the AIR shows it does not bind the commitment: the relation is checked mod p=0x700001, not mod Q=8380417, and the quotient is unconstrained. Any amount satisfies it, so PR #9/#12 overhead numbers come from a circuit that does not enforce what it claims. Those numbers cannot support an H4 verdict.\n\nFixes required before a confirmatory run are listed in section 0 of the doc.\n\n🤖 Generated with [Claude Code](https://claude.com/claude-code)","createdAt":"2026-10-06T15:12:30Z","headRefName":"maanas/h4-confirmatory-params","mergedAt":"2026-10-06T16:32:17Z","number":16,"state":"MERGED","title":"docs(h4): pre-register confirmatory params; halt run on soundness defect"},{"author":{"id":"U_kgDOCsvrOA","is_bot":false,"login":"maanas1234","name":"Maanas Tyagi "},"body":"Corrects the H2 status. Verified from committed CSVs (seed 42):\n\n- Centralized GCN at 100% labels: F1 0.743, 114 false positives.\n- FedAvg at 100% labels: F1 0.401, 1394 false positives (~12x centralized).\n- The 'degrades less under scarcity' pattern is partly a starting-point artifact.\n- Boundary channel shows no benefit; higher lambda lowers F1.\n\nOriginal H2 criterion (federated vs centralized under scarcity, >=20% fewer FP, multiple seeds, significance, DP bound) is NOT yet tested. Listed as open in the README.\n\n🤖 Generated with [Claude Code](https://claude.com/claude-code)","createdAt":"2026-10-06T15:01:25Z","headRefName":"maanas/h2-status-correction","mergedAt":"2026-10-06T16:32:11Z","number":15,"state":"MERGED","title":"docs(h2): record verified findings and open H2 criteria"},{"author":{"id":"U_kgDOCsvrOA","is_bot":false,"login":"maanas1234","name":"Maanas Tyagi "},"body":"Adds a pass/fail table to the H1 v2 README that matches WRITEUP.md, and lists the caveats that must travel with the speedup number: depth dependence, hardware dependence, and per-dispute gas failure. No code or result changes.\n\n🤖 Generated with [Claude Code](https://claude.com/claude-code)","createdAt":"2026-10-06T15:00:25Z","headRefName":"maanas/h1-verdict-summary","mergedAt":"2026-10-06T16:32:05Z","number":14,"state":"MERGED","title":"docs(h1): add verdict summary and caveats to README"},{"author":{"id":"U_kgDOCsvrOA","is_bot":false,"login":"maanas1234","name":"Maanas Tyagi "},"body":"Commits the reproduced H3 confirmatory output (configs/experiment.yaml, seed 42, n=20 per group, 50 steps) so the z-test verdict has committed evidence.\n\n- Reproduced: control 542/1000, treatment 319/1000, p = 3.7e-24, SUPPORTED under the predefined rule.\n- Records pseudo-replication limitation (actions not independent per agent; clustered SEs needed).\n- Per-agent majority-bar definition left explicitly open (strict zero-violation: 0/20 pass; rate <=50%: 19/20 pass).\n- Sybil result unchanged: SYBIL_SUCCEEDED, documented limitation.\n\n🤖 Generated with [Claude Code](https://claude.com/claude-code)","createdAt":"2026-10-06T14:59:54Z","headRefName":"maanas/h3-confirmatory-record","mergedAt":"2026-10-06T16:32:00Z","number":13,"state":"MERGED","title":"docs(h3): commit confirmatory result and record limitations"},{"author":{"id":"U_kgDOB0Ytew","is_bot":false,"login":"simranpundirr","name":"Simran Pundir"},"body":"## Summary\r\n\r\nThis PR documents the H4 production-candidate evaluation and records the post-hoc exploratory overhead bound before interpreting the benchmark results.\r\n\r\n### Post-hoc exploratory bounds\r\n- Proof size: ≤ 20×\r\n- Proving time: ≤ 200×\r\n- Verification time: ≤ 10×\r\n\r\n### Observed matched-benchmark overhead\r\n- Proof size: 31,792 B vs 2,233 B = 14.2× — PASS\r\n- Proving time: ~70 ms vs 0.448 ms = ~156× — PASS\r\n- Verification time: 1.10 ms vs 0.187 ms = 5.9× — PASS\r\n\r\n### Security interpretation\r\nThe `research-candidate-128x256` profile is explicitly treated as a research candidate. No specific NIST PQ security category is claimed; a concrete SIS attack-cost/security analysis is required before assigning a defensible security level or calling the parameters production-ready.\r\n\r\n### Coverage limitation\r\nThe current experiment evaluates only a 2×2 matrix-multiplication workload. It does not yet cover the model classes used in H1–H3, so the bounded-overhead result cannot yet be generalized to the full H4 hypothesis.\r\n\r\n### Conclusion\r\nThe three overhead metrics pass the post-hoc exploratory bounds for the evaluated workload, but H4 is not yet fully established because H1–H3 model coverage and concrete PQ security analysis remain incomplete.","createdAt":"2026-10-06T02:44:02Z","headRefName":"simran/h4-production-params","mergedAt":"2026-10-06T14:54:37Z","number":12,"state":"MERGED","title":"Simran/h4 production params"},{"author":{"id":"U_kgDOCtwXRw","is_bot":false,"login":"Anjali503","name":"Anjali Agrahari"},"body":"## What was built\r\n\r\nImplemented the H3 Sybil / identity-reset attack test inside `h3-abt/`.\r\n\r\n- Deterministic Sybil attack scenario\r\n- Original identity registration and staking\r\n- Policy violation and automatic slashing\r\n- Identity-reset attempt using a fresh agent ID\r\n- Fresh ABT and stake acquisition test\r\n- Violation-history comparison between original and fresh identities\r\n- Explicit Sybil outcome reporting\r\n- Unit/integration tests\r\n- CLI and JSON output\r\n\r\n## Validation\r\n\r\n- 59/59 H3 tests passed\r\n- Seed: 42\r\n- Original stake: 100\r\n- Slash amount: 100\r\n- Remaining stake: 0\r\n- Original violation count: 1\r\n- New identity registration: successful\r\n- Fresh ABT: obtained\r\n- Fresh stake: 100\r\n- New violation count: 0\r\n- Previous liability bypassed: true\r\n- Logical-agent binding: false\r\n\r\n## Result\r\n\r\n`SYBIL_SUCCEEDED`\r\n\r\nThe current in-simulation ABT registry keys accounts by `agent_id` string. A fresh identity can therefore obtain a new ABT and stake with empty violation history.\r\n\r\nThis result is reported as a limitation of the current identity model. It is separate from the control-vs-treatment statistical analysis and is not a claim that H3 is universally proven.\r\n\r\n## Scope\r\n\r\nOnly `h3-abt/` was modified.","createdAt":"2026-09-19T06:36:55Z","headRefName":"anjali/h3-sybil","mergedAt":"2026-09-20T18:15:30Z","number":11,"state":"MERGED","title":"feat(h3): Sybil Identity-Reset Attack Test"},{"author":{"id":"U_kgDOCtwXRw","is_bot":false,"login":"Anjali503","name":"Anjali Agrahari"},"body":"## What was built\r\n\r\nImplemented the H3 control-vs-treatment experiment and statistical analysis inside `h3-abt/`.\r\n\r\n- Reproducible control and treatment experiment runner\r\n- Shared opportunity/environment generation for both groups\r\n- Control group using the unstaked baseline\r\n- Treatment group using the staked ABT mechanism\r\n- Violation-rate and experiment metrics\r\n- One-sided two-proportion z-test for comparing treatment vs control\r\n- Numerically stable p-value calculation\r\n- Configurable smoke and experiment configurations\r\n- JSON/CSV result support\r\n- Statistical and experiment tests\r\n- Documentation for the experimental procedure and interpretation\r\n\r\n## Validation\r\n\r\n- 71/71 tests passed\r\n- Working tree clean\r\n- Experiment configuration: `configs/experiment.yaml`\r\n- Seed: 42\r\n- Control: 542/1000 violations (54.2%)\r\n- Treatment: 319/1000 violations (31.9%)\r\n- Absolute difference: -22.3 percentage points\r\n- Relative reduction: 41.14%\r\n- z = -10.070625\r\n- One-sided p = 3.725157e-24\r\n\r\nUnder the predefined decision rule for this configuration, the treatment violation rate is lower than the control rate and p < 0.05, so the run is labeled `SUPPORTED`.\r\n\r\nThese results are specific to the stated simulation configuration and should not be interpreted as universal proof of H3.\r\n\r\n## Research-design notes\r\n\r\n- The treatment does not hard-code agents to refuse violations; the existing economic decision rule determines whether an action is executed.\r\n- The treatment can still execute a violating action when the private gain is sufficiently high relative to the expected financial liability.\r\n- The smoke-test configuration is used for wiring/reproducibility checks and is not treated as confirmatory evidence.\r\n- No minimum effect size was introduced because H3 does not specify one.\r\n- The current statistical test is an action-level two-proportion z-test; repeated observations from the same agent are not modeled with clustered standard errors and this remains a limitation.\r\n- The experiment uses a configurable seed and shared opportunity generation to support reproducibility and a controlled comparison.\r\n\r\n## Scope\r\n\r\nOnly `h3-abt/` was modified.\r\n\r\n## Next milestone\r\n\r\nImplement and evaluate the Sybil / identity-reset attack separately from this statistical-analysis milestone.","createdAt":"2026-09-19T05:45:24Z","headRefName":"anjali/h3-analysis","mergedAt":"2026-09-19T09:43:18Z","number":10,"state":"MERGED","title":"feat(h3): add control treatment statistical analysis"},{"author":{"id":"U_kgDOB0Ytew","is_bot":false,"login":"simranpundirr","name":"Simran Pundir"},"body":"## H4 — Post-Quantum Zero-Knowledge Proof Feasibility\r\n\r\n### Hypothesis\r\n\r\n> A lattice-based ZK-STARK construction can secure ZKML proof verification for the model classes used in H1–H3 while keeping proof size and verifier latency within a bounded overhead factor relative to classical (non-quantum-resistant) ZK-STARKs, making PQC migration practical without re-architecting the settlement layer.\r\n\r\n### Objective\r\n\r\nThis work establishes a classical ZK-STARK baseline and a lattice-backed ZK-STARK prototype, then compares proof size and verifier latency under a matched experimental environment.\r\n\r\n### Implementation\r\n\r\nThe branch contains:\r\n\r\n- `classical/matrix_stark/` — original classical STARK baseline.\r\n- `classical/matched_matrix_stark/` — matched classical baseline using the same Winterfell environment as the PQ prototype.\r\n- `pq/matched_matrix_stark/` — lattice-backed STARK prototype enforcing the same matrix computation together with an SIS-style lattice relation.\r\n- `experiments/benchmark_results.csv` — benchmark measurements from repeated runs.\r\n- `README.md` — implementation details, methodology, results, and limitations.\r\n\r\n### Validation\r\n\r\nThe lattice-backed prototype was tested against:\r\n\r\n1. Valid 2×2 matrix multiplication — accepted.\r\n2. Tampered matrix output — rejected.\r\n3. Tampered matrix input — rejected.\r\n\r\n### Matched Benchmark\r\n\r\n10 runs were performed for both matched implementations.\r\n\r\n| Metric | Classical | Lattice-backed PQ | Overhead |\r\n|---|---:|---:|---:|\r\n| Proof size | 2,233 B | 2,491 B | 1.116× (+11.6%) |\r\n| Proving time | 0.448 ms | 0.639 ms | 1.426× (+42.6%) |\r\n| Verification time | 0.187 ms | 0.193 ms | 1.032× (+3.2%) |\r\n| Successful runs | 10/10 | 10/10 | — |\r\n\r\nFor the tested 2×2 workload, the lattice-backed prototype therefore produced a 11.6% increase in proof size and a 3.2% increase in verification latency relative to the matched classical baseline.\r\n\r\n### Current Finding\r\n\r\nThe experiment demonstrates that the lattice-backed relation can be incorporated into the STARK AIR while maintaining a relatively small measured overhead for the tested workload.\r\n\r\nThese measurements are prototype-specific and should not be interpreted as a general performance claim for lattice-based ZK-STARKs.\r\n\r\n### Limitations\r\n\r\n- The current lattice parameters are prototype/debug parameters and do not constitute a demonstrated production-level post-quantum security instantiation.\r\n- The current workload is a small 2×2 matrix computation and does not yet establish coverage of the model classes used in H1–H3.\r\n- The lattice-backed construction has not undergone external cryptographic review.\r\n- Settlement-layer migration has not yet been experimentally validated.\r\n\r\n### Next Step\r\n\r\nThe next stage is to evaluate realistic lattice parameters and extend the benchmark to larger and ZKML-relevant workloads, followed by a comparison of proof-size and verifier-latency overhead.","createdAt":"2026-09-18T16:00:55Z","headRefName":"simran/h4-pqc-stark","mergedAt":"2026-09-19T04:32:43Z","number":9,"state":"MERGED","title":"Simran/h4 pqc stark H4: Add lattice-backed ZK-STARK prototype and benchmark comparison"},{"author":{"id":"U_kgDOEdWoow","is_bot":false,"login":"indrakshi2006-boop","name":"Indrakshi"},"body":"","createdAt":"2026-09-16T19:47:23Z","headRefName":"h2-federated-aml-ii","mergedAt":"2026-09-18T14:49:43Z","number":8,"state":"MERGED","title":"H2 federated aml ii"},{"author":{"id":"U_kgDOCaI0xQ","is_bot":false,"login":"amanhooda2005","name":""},"body":"","createdAt":"2026-09-14T17:27:43Z","headRefName":"aman/H1-zkopml-v2","mergedAt":"2026-09-16T17:16:20Z","number":7,"state":"MERGED","title":"H1 zk-OPML v2"},{"author":{"id":"U_kgDOCtwXRw","is_bot":false,"login":"Anjali503","name":"Anjali Agrahari"},"body":"## What was built\r\n\r\nImplemented the H3 staked treatment and cryptoeconomic liability mechanism inside `h3-abt/`.\r\n\r\n- ABT identity registry\r\n- Identity-bound, non-transferable ABT\r\n- Agent stake/collateral tracking\r\n- Automatic slashing on detected policy violations\r\n- Violation history\r\n- Remaining-stake tracking\r\n- Staked treatment simulation\r\n- Same economic decision rule as the unstaked control\r\n- Separate detection RNG so slashing does not alter the opportunity stream\r\n- Tests for ABT, staking, slashing, and treatment behavior\r\n\r\n## Validation\r\n\r\n- 48/48 tests passed\r\n- Constructed economic decision cases passed\r\n- Staked and unstaked smoke tests are reproducible with seed 42\r\n\r\nSmoke-test traces:\r\n- Unstaked: 36/60 violations (60%)\r\n- Staked: 0/60 violations (0%)\r\n\r\nThese are wiring smoke tests only and are NOT confirmatory H3 results.\r\n\r\n## Research design\r\n\r\nThe staked treatment does not force agents to refuse violations. The decision rule compares expected private gain against expected financial liability.\r\n\r\nFor example, sufficiently high private gain can still cause a staked agent to execute a violating action, after which the configured stake is automatically slashed.\r\n\r\nNo statistical significance test or H3 pass/fail claim is included in this milestone.\r\n\r\n## Scope\r\n\r\nOnly `h3-abt/` was modified.","createdAt":"2026-09-11T15:41:22Z","headRefName":"anjali/h3-staking","mergedAt":"2026-09-16T17:16:35Z","number":6,"state":"MERGED","title":"Anjali/h3 staking"},{"author":{"id":"U_kgDOCtwXRw","is_bot":false,"login":"Anjali503","name":"Anjali Agrahari"},"body":"## What was built\r\n\r\nImplemented the H3 unstaked control/baseline simulation inside `h3-abt/`.\r\n\r\n- Configurable multi-agent unstaked simulation\r\n- Shared economic decision rule from PR 1\r\n- Shared opportunity/environment generator\r\n- Action and violation logging\r\n- Total actions, violations, and violation-rate calculation\r\n- Reproducible simulation using a configurable seed\r\n- Baseline CLI and documentation\r\n- Unit/integration tests\r\n\r\n## Validation\r\n\r\n- 27/27 tests passed\r\n- Seed-42 smoke test reproduced consistently\r\n- Smoke test: 3 unstaked agents × 20 steps = 60 actions\r\n- Smoke-test violations: 36\r\n- Smoke-test violation rate: 60%\r\n\r\nThese smoke-test numbers are NOT confirmatory H3 results and are not evidence that H3 is supported.\r\n\r\n## Scope\r\n\r\nOnly `h3-abt/` was modified.\r\n\r\n## Research design\r\n\r\nThe simulation reuses the economic decision rule rather than hard-coding violation times. A policy-violating opportunity is counted as a violation only when the agent chooses `EXECUTE`.\r\n\r\n## Next milestone\r\n\r\nImplement the staked treatment and automatic slashing mechanism.","createdAt":"2026-09-11T14:57:53Z","headRefName":"anjali/h3-baseline","mergedAt":"2026-09-11T17:28:15Z","number":5,"state":"MERGED","title":"feat(h3): add unstaked baseline simulation"},{"author":{"id":"U_kgDOCsvrOA","is_bot":false,"login":"maanas1234","name":"Maanas Tyagi "},"body":"Aman's merged PR landed his H1 work in a duplicate folder named \"h1-zkopml 5\" (space + 5, likely a GitHub web-upload artifact) instead of h1-zkopml/. This moves all his real content (data/, model/, proofs/, requirements.txt, README) into the correct path and removes the empty duplicate. No content changes, pure path fix.","createdAt":"2026-09-10T19:13:19Z","headRefName":"maanas/fix-h1-folder-path","mergedAt":"2026-09-10T19:15:36Z","number":4,"state":"MERGED","title":"fix(h1): move content out of misfiled 'h1-zkopml 5' folder"},{"author":{"id":"U_kgDOEdWoow","is_bot":false,"login":"indrakshi2006-boop","name":"Indrakshi"},"body":"","createdAt":"2026-09-07T17:52:33Z","headRefName":"h2_aml-patch-1","mergedAt":"2026-09-10T19:15:45Z","number":3,"state":"MERGED","title":"Add files via upload"},{"author":{"id":"U_kgDOCtwXRw","is_bot":false,"login":"Anjali503","name":"Anjali Agrahari"},"body":"## What was built\r\n\r\nImplemented the H3 behavioral protocol inside `h3-abt/`.\r\n\r\n- Machine-checkable policy violation function\r\n- Expected-payoff agent decision rule with stake/slash term\r\n- Treatment vs control represented using `is_staked`\r\n- Configurable experiment parameters and seed\r\n- Future experiment output schema\r\n- Unit tests for protocol and configuration behavior\r\n\r\n## Validation\r\n\r\n- 16 unit tests passed\r\n- No experiment was run\r\n- No H3 behavioral result is claimed\r\n- 3-vs-3 configuration is only a smoke-test configuration, not confirmatory sample size\r\n\r\n## Scope\r\n\r\nOnly `h3-abt/` was modified.\r\n\r\n## Next milestone\r\n\r\nBuild the unstaked baseline simulation before adding the staked treatment, so the control behavior can be established independently.","createdAt":"2026-09-06T21:09:22Z","headRefName":"anjali/h3-baseline","mergedAt":"2026-09-07T03:00:41Z","number":2,"state":"MERGED","title":"feat(h3): establish ABT behavioral protocol"},{"author":{"id":"U_kgDOCsvrOA","is_bot":false,"login":"maanas1234","name":"Maanas Tyagi "},"body":"","createdAt":"2026-09-06T11:06:33Z","headRefName":"aman/H1-baseline","mergedAt":"2026-09-06T11:06:50Z","number":1,"state":"MERGED","title":"Add files via upload"}]
+[
+  {
+    "author": {
+      "id": "U_kgDOCsvrOA",
+      "is_bot": false,
+      "login": "maanas1234",
+      "name": "Maanas Tyagi "
+    },
+    "body": "",
+    "createdAt": "2026-09-06T11:06:33Z",
+    "headRefName": "aman/H1-baseline",
+    "mergedAt": "2026-09-06T11:06:50Z",
+    "number": 1,
+    "state": "MERGED",
+    "title": "Add files via upload"
+  },
+  {
+    "author": {
+      "id": "U_kgDOCtwXRw",
+      "is_bot": false,
+      "login": "Anjali503",
+      "name": "Anjali Agrahari"
+    },
+    "body": "## What was built\r\n\r\nImplemented the H3 behavioral protocol inside `h3-abt/`.\r\n\r\n- Machine-checkable policy violation function\r\n- Expected-payoff agent decision rule with stake/slash term\r\n- Treatment vs control represented using `is_staked`\r\n- Configurable experiment parameters and seed\r\n- Future experiment output schema\r\n- Unit tests for protocol and configuration behavior\r\n\r\n## Validation\r\n\r\n- 16 unit tests passed\r\n- No experiment was run\r\n- No H3 behavioral result is claimed\r\n- 3-vs-3 configuration is only a smoke-test configuration, not confirmatory sample size\r\n\r\n## Scope\r\n\r\nOnly `h3-abt/` was modified.\r\n\r\n## Next milestone\r\n\r\nBuild the unstaked baseline simulation before adding the staked treatment, so the control behavior can be established independently.",
+    "createdAt": "2026-09-06T21:09:22Z",
+    "headRefName": "anjali/h3-baseline",
+    "mergedAt": "2026-09-07T03:00:41Z",
+    "number": 2,
+    "state": "MERGED",
+    "title": "feat(h3): establish ABT behavioral protocol"
+  },
+  {
+    "author": {
+      "id": "U_kgDOEdWoow",
+      "is_bot": false,
+      "login": "indrakshi2006-boop",
+      "name": "Indrakshi"
+    },
+    "body": "",
+    "createdAt": "2026-09-07T17:52:33Z",
+    "headRefName": "h2_aml-patch-1",
+    "mergedAt": "2026-09-10T19:15:45Z",
+    "number": 3,
+    "state": "MERGED",
+    "title": "Add files via upload"
+  },
+  {
+    "author": {
+      "id": "U_kgDOCsvrOA",
+      "is_bot": false,
+      "login": "maanas1234",
+      "name": "Maanas Tyagi "
+    },
+    "body": "Aman's merged PR landed his H1 work in a duplicate folder named \"h1-zkopml 5\" (space + 5, likely a GitHub web-upload artifact) instead of h1-zkopml/. This moves all his real content (data/, model/, proofs/, requirements.txt, README) into the correct path and removes the empty duplicate. No content changes, pure path fix.",
+    "createdAt": "2026-09-10T19:13:19Z",
+    "headRefName": "maanas/fix-h1-folder-path",
+    "mergedAt": "2026-09-10T19:15:36Z",
+    "number": 4,
+    "state": "MERGED",
+    "title": "fix(h1): move content out of misfiled 'h1-zkopml 5' folder"
+  },
+  {
+    "author": {
+      "id": "U_kgDOCtwXRw",
+      "is_bot": false,
+      "login": "Anjali503",
+      "name": "Anjali Agrahari"
+    },
+    "body": "## What was built\r\n\r\nImplemented the H3 unstaked control/baseline simulation inside `h3-abt/`.\r\n\r\n- Configurable multi-agent unstaked simulation\r\n- Shared economic decision rule from PR 1\r\n- Shared opportunity/environment generator\r\n- Action and violation logging\r\n- Total actions, violations, and violation-rate calculation\r\n- Reproducible simulation using a configurable seed\r\n- Baseline CLI and documentation\r\n- Unit/integration tests\r\n\r\n## Validation\r\n\r\n- 27/27 tests passed\r\n- Seed-42 smoke test reproduced consistently\r\n- Smoke test: 3 unstaked agents × 20 steps = 60 actions\r\n- Smoke-test violations: 36\r\n- Smoke-test violation rate: 60%\r\n\r\nThese smoke-test numbers are NOT confirmatory H3 results and are not evidence that H3 is supported.\r\n\r\n## Scope\r\n\r\nOnly `h3-abt/` was modified.\r\n\r\n## Research design\r\n\r\nThe simulation reuses the economic decision rule rather than hard-coding violation times. A policy-violating opportunity is counted as a violation only when the agent chooses `EXECUTE`.\r\n\r\n## Next milestone\r\n\r\nImplement the staked treatment and automatic slashing mechanism.",
+    "createdAt": "2026-09-11T14:57:53Z",
+    "headRefName": "anjali/h3-baseline",
+    "mergedAt": "2026-09-11T17:28:15Z",
+    "number": 5,
+    "state": "MERGED",
+    "title": "feat(h3): add unstaked baseline simulation"
+  },
+  {
+    "author": {
+      "id": "U_kgDOCtwXRw",
+      "is_bot": false,
+      "login": "Anjali503",
+      "name": "Anjali Agrahari"
+    },
+    "body": "## What was built\r\n\r\nImplemented the H3 staked treatment and cryptoeconomic liability mechanism inside `h3-abt/`.\r\n\r\n- ABT identity registry\r\n- Identity-bound, non-transferable ABT\r\n- Agent stake/collateral tracking\r\n- Automatic slashing on detected policy violations\r\n- Violation history\r\n- Remaining-stake tracking\r\n- Staked treatment simulation\r\n- Same economic decision rule as the unstaked control\r\n- Separate detection RNG so slashing does not alter the opportunity stream\r\n- Tests for ABT, staking, slashing, and treatment behavior\r\n\r\n## Validation\r\n\r\n- 48/48 tests passed\r\n- Constructed economic decision cases passed\r\n- Staked and unstaked smoke tests are reproducible with seed 42\r\n\r\nSmoke-test traces:\r\n- Unstaked: 36/60 violations (60%)\r\n- Staked: 0/60 violations (0%)\r\n\r\nThese are wiring smoke tests only and are NOT confirmatory H3 results.\r\n\r\n## Research design\r\n\r\nThe staked treatment does not force agents to refuse violations. The decision rule compares expected private gain against expected financial liability.\r\n\r\nFor example, sufficiently high private gain can still cause a staked agent to execute a violating action, after which the configured stake is automatically slashed.\r\n\r\nNo statistical significance test or H3 pass/fail claim is included in this milestone.\r\n\r\n## Scope\r\n\r\nOnly `h3-abt/` was modified.",
+    "createdAt": "2026-09-11T15:41:22Z",
+    "headRefName": "anjali/h3-staking",
+    "mergedAt": "2026-09-16T17:16:35Z",
+    "number": 6,
+    "state": "MERGED",
+    "title": "Anjali/h3 staking"
+  },
+  {
+    "author": {
+      "id": "U_kgDOCaI0xQ",
+      "is_bot": false,
+      "login": "amanhooda2005",
+      "name": ""
+    },
+    "body": "",
+    "createdAt": "2026-09-14T17:27:43Z",
+    "headRefName": "aman/H1-zkopml-v2",
+    "mergedAt": "2026-09-16T17:16:20Z",
+    "number": 7,
+    "state": "MERGED",
+    "title": "H1 zk-OPML v2"
+  },
+  {
+    "author": {
+      "id": "U_kgDOEdWoow",
+      "is_bot": false,
+      "login": "indrakshi2006-boop",
+      "name": "Indrakshi"
+    },
+    "body": "",
+    "createdAt": "2026-09-16T19:47:23Z",
+    "headRefName": "h2-federated-aml-ii",
+    "mergedAt": "2026-09-18T14:49:43Z",
+    "number": 8,
+    "state": "MERGED",
+    "title": "H2 federated aml ii"
+  },
+  {
+    "author": {
+      "id": "U_kgDOB0Ytew",
+      "is_bot": false,
+      "login": "simranpundirr",
+      "name": "Simran Pundir"
+    },
+    "body": "## H4 — Post-Quantum Zero-Knowledge Proof Feasibility\r\n\r\n### Hypothesis\r\n\r\n> A lattice-based ZK-STARK construction can secure ZKML proof verification for the model classes used in H1–H3 while keeping proof size and verifier latency within a bounded overhead factor relative to classical (non-quantum-resistant) ZK-STARKs, making PQC migration practical without re-architecting the settlement layer.\r\n\r\n### Objective\r\n\r\nThis work establishes a classical ZK-STARK baseline and a lattice-backed ZK-STARK prototype, then compares proof size and verifier latency under a matched experimental environment.\r\n\r\n### Implementation\r\n\r\nThe branch contains:\r\n\r\n- `classical/matrix_stark/` — original classical STARK baseline.\r\n- `classical/matched_matrix_stark/` — matched classical baseline using the same Winterfell environment as the PQ prototype.\r\n- `pq/matched_matrix_stark/` — lattice-backed STARK prototype enforcing the same matrix computation together with an SIS-style lattice relation.\r\n- `experiments/benchmark_results.csv` — benchmark measurements from repeated runs.\r\n- `README.md` — implementation details, methodology, results, and limitations.\r\n\r\n### Validation\r\n\r\nThe lattice-backed prototype was tested against:\r\n\r\n1. Valid 2×2 matrix multiplication — accepted.\r\n2. Tampered matrix output — rejected.\r\n3. Tampered matrix input — rejected.\r\n\r\n### Matched Benchmark\r\n\r\n10 runs were performed for both matched implementations.\r\n\r\n| Metric | Classical | Lattice-backed PQ | Overhead |\r\n|---|---:|---:|---:|\r\n| Proof size | 2,233 B | 2,491 B | 1.116× (+11.6%) |\r\n| Proving time | 0.448 ms | 0.639 ms | 1.426× (+42.6%) |\r\n| Verification time | 0.187 ms | 0.193 ms | 1.032× (+3.2%) |\r\n| Successful runs | 10/10 | 10/10 | — |\r\n\r\nFor the tested 2×2 workload, the lattice-backed prototype therefore produced a 11.6% increase in proof size and a 3.2% increase in verification latency relative to the matched classical baseline.\r\n\r\n### Current Finding\r\n\r\nThe experiment demonstrates that the lattice-backed relation can be incorporated into the STARK AIR while maintaining a relatively small measured overhead for the tested workload.\r\n\r\nThese measurements are prototype-specific and should not be interpreted as a general performance claim for lattice-based ZK-STARKs.\r\n\r\n### Limitations\r\n\r\n- The current lattice parameters are prototype/debug parameters and do not constitute a demonstrated production-level post-quantum security instantiation.\r\n- The current workload is a small 2×2 matrix computation and does not yet establish coverage of the model classes used in H1–H3.\r\n- The lattice-backed construction has not undergone external cryptographic review.\r\n- Settlement-layer migration has not yet been experimentally validated.\r\n\r\n### Next Step\r\n\r\nThe next stage is to evaluate realistic lattice parameters and extend the benchmark to larger and ZKML-relevant workloads, followed by a comparison of proof-size and verifier-latency overhead.",
+    "createdAt": "2026-09-18T16:00:55Z",
+    "headRefName": "simran/h4-pqc-stark",
+    "mergedAt": "2026-09-19T04:32:43Z",
+    "number": 9,
+    "state": "MERGED",
+    "title": "Simran/h4 pqc stark H4: Add lattice-backed ZK-STARK prototype and benchmark comparison"
+  },
+  {
+    "author": {
+      "id": "U_kgDOCtwXRw",
+      "is_bot": false,
+      "login": "Anjali503",
+      "name": "Anjali Agrahari"
+    },
+    "body": "## What was built\r\n\r\nImplemented the H3 control-vs-treatment experiment and statistical analysis inside `h3-abt/`.\r\n\r\n- Reproducible control and treatment experiment runner\r\n- Shared opportunity/environment generation for both groups\r\n- Control group using the unstaked baseline\r\n- Treatment group using the staked ABT mechanism\r\n- Violation-rate and experiment metrics\r\n- One-sided two-proportion z-test for comparing treatment vs control\r\n- Numerically stable p-value calculation\r\n- Configurable smoke and experiment configurations\r\n- JSON/CSV result support\r\n- Statistical and experiment tests\r\n- Documentation for the experimental procedure and interpretation\r\n\r\n## Validation\r\n\r\n- 71/71 tests passed\r\n- Working tree clean\r\n- Experiment configuration: `configs/experiment.yaml`\r\n- Seed: 42\r\n- Control: 542/1000 violations (54.2%)\r\n- Treatment: 319/1000 violations (31.9%)\r\n- Absolute difference: -22.3 percentage points\r\n- Relative reduction: 41.14%\r\n- z = -10.070625\r\n- One-sided p = 3.725157e-24\r\n\r\nUnder the predefined decision rule for this configuration, the treatment violation rate is lower than the control rate and p < 0.05, so the run is labeled `SUPPORTED`.\r\n\r\nThese results are specific to the stated simulation configuration and should not be interpreted as universal proof of H3.\r\n\r\n## Research-design notes\r\n\r\n- The treatment does not hard-code agents to refuse violations; the existing economic decision rule determines whether an action is executed.\r\n- The treatment can still execute a violating action when the private gain is sufficiently high relative to the expected financial liability.\r\n- The smoke-test configuration is used for wiring/reproducibility checks and is not treated as confirmatory evidence.\r\n- No minimum effect size was introduced because H3 does not specify one.\r\n- The current statistical test is an action-level two-proportion z-test; repeated observations from the same agent are not modeled with clustered standard errors and this remains a limitation.\r\n- The experiment uses a configurable seed and shared opportunity generation to support reproducibility and a controlled comparison.\r\n\r\n## Scope\r\n\r\nOnly `h3-abt/` was modified.\r\n\r\n## Next milestone\r\n\r\nImplement and evaluate the Sybil / identity-reset attack separately from this statistical-analysis milestone.",
+    "createdAt": "2026-09-19T05:45:24Z",
+    "headRefName": "anjali/h3-analysis",
+    "mergedAt": "2026-09-19T09:43:18Z",
+    "number": 10,
+    "state": "MERGED",
+    "title": "feat(h3): add control treatment statistical analysis"
+  },
+  {
+    "author": {
+      "id": "U_kgDOCtwXRw",
+      "is_bot": false,
+      "login": "Anjali503",
+      "name": "Anjali Agrahari"
+    },
+    "body": "## What was built\r\n\r\nImplemented the H3 Sybil / identity-reset attack test inside `h3-abt/`.\r\n\r\n- Deterministic Sybil attack scenario\r\n- Original identity registration and staking\r\n- Policy violation and automatic slashing\r\n- Identity-reset attempt using a fresh agent ID\r\n- Fresh ABT and stake acquisition test\r\n- Violation-history comparison between original and fresh identities\r\n- Explicit Sybil outcome reporting\r\n- Unit/integration tests\r\n- CLI and JSON output\r\n\r\n## Validation\r\n\r\n- 59/59 H3 tests passed\r\n- Seed: 42\r\n- Original stake: 100\r\n- Slash amount: 100\r\n- Remaining stake: 0\r\n- Original violation count: 1\r\n- New identity registration: successful\r\n- Fresh ABT: obtained\r\n- Fresh stake: 100\r\n- New violation count: 0\r\n- Previous liability bypassed: true\r\n- Logical-agent binding: false\r\n\r\n## Result\r\n\r\n`SYBIL_SUCCEEDED`\r\n\r\nThe current in-simulation ABT registry keys accounts by `agent_id` string. A fresh identity can therefore obtain a new ABT and stake with empty violation history.\r\n\r\nThis result is reported as a limitation of the current identity model. It is separate from the control-vs-treatment statistical analysis and is not a claim that H3 is universally proven.\r\n\r\n## Scope\r\n\r\nOnly `h3-abt/` was modified.",
+    "createdAt": "2026-09-19T06:36:55Z",
+    "headRefName": "anjali/h3-sybil",
+    "mergedAt": "2026-09-20T18:15:30Z",
+    "number": 11,
+    "state": "MERGED",
+    "title": "feat(h3): Sybil Identity-Reset Attack Test"
+  },
+  {
+    "author": {
+      "id": "U_kgDOB0Ytew",
+      "is_bot": false,
+      "login": "simranpundirr",
+      "name": "Simran Pundir"
+    },
+    "body": "## Summary\r\n\r\nThis PR documents the H4 production-candidate evaluation and records the post-hoc exploratory overhead bound before interpreting the benchmark results.\r\n\r\n### Post-hoc exploratory bounds\r\n- Proof size: ≤ 20×\r\n- Proving time: ≤ 200×\r\n- Verification time: ≤ 10×\r\n\r\n### Observed matched-benchmark overhead\r\n- Proof size: 31,792 B vs 2,233 B = 14.2× — PASS\r\n- Proving time: ~70 ms vs 0.448 ms = ~156× — PASS\r\n- Verification time: 1.10 ms vs 0.187 ms = 5.9× — PASS\r\n\r\n### Security interpretation\r\nThe `research-candidate-128x256` profile is explicitly treated as a research candidate. No specific NIST PQ security category is claimed; a concrete SIS attack-cost/security analysis is required before assigning a defensible security level or calling the parameters production-ready.\r\n\r\n### Coverage limitation\r\nThe current experiment evaluates only a 2×2 matrix-multiplication workload. It does not yet cover the model classes used in H1–H3, so the bounded-overhead result cannot yet be generalized to the full H4 hypothesis.\r\n\r\n### Conclusion\r\nThe three overhead metrics pass the post-hoc exploratory bounds for the evaluated workload, but H4 is not yet fully established because H1–H3 model coverage and concrete PQ security analysis remain incomplete.",
+    "createdAt": "2026-10-06T02:44:02Z",
+    "headRefName": "simran/h4-production-params",
+    "mergedAt": "2026-10-06T14:54:37Z",
+    "number": 12,
+    "state": "MERGED",
+    "title": "Simran/h4 production params"
+  },
+  {
+    "author": {
+      "id": "U_kgDOCsvrOA",
+      "is_bot": false,
+      "login": "maanas1234",
+      "name": "Maanas Tyagi "
+    },
+    "body": "Commits the reproduced H3 confirmatory output (configs/experiment.yaml, seed 42, n=20 per group, 50 steps) so the z-test verdict has committed evidence.\n\n- Reproduced: control 542/1000, treatment 319/1000, p = 3.7e-24, SUPPORTED under the predefined rule.\n- Records pseudo-replication limitation (actions not independent per agent; clustered SEs needed).\n- Per-agent majority-bar definition left explicitly open (strict zero-violation: 0/20 pass; rate <=50%: 19/20 pass).\n- Sybil result unchanged: SYBIL_SUCCEEDED, documented limitation.\n\n🤖 Generated with [Claude Code](https://claude.com/claude-code)",
+    "createdAt": "2026-10-06T14:59:54Z",
+    "headRefName": "maanas/h3-confirmatory-record",
+    "mergedAt": "2026-10-06T16:32:00Z",
+    "number": 13,
+    "state": "MERGED",
+    "title": "docs(h3): commit confirmatory result and record limitations"
+  },
+  {
+    "author": {
+      "id": "U_kgDOCsvrOA",
+      "is_bot": false,
+      "login": "maanas1234",
+      "name": "Maanas Tyagi "
+    },
+    "body": "Adds a pass/fail table to the H1 v2 README that matches WRITEUP.md, and lists the caveats that must travel with the speedup number: depth dependence, hardware dependence, and per-dispute gas failure. No code or result changes.\n\n🤖 Generated with [Claude Code](https://claude.com/claude-code)",
+    "createdAt": "2026-10-06T15:00:25Z",
+    "headRefName": "maanas/h1-verdict-summary",
+    "mergedAt": "2026-10-06T16:32:05Z",
+    "number": 14,
+    "state": "MERGED",
+    "title": "docs(h1): add verdict summary and caveats to README"
+  },
+  {
+    "author": {
+      "id": "U_kgDOCsvrOA",
+      "is_bot": false,
+      "login": "maanas1234",
+      "name": "Maanas Tyagi "
+    },
+    "body": "Corrects the H2 status. Verified from committed CSVs (seed 42):\n\n- Centralized GCN at 100% labels: F1 0.743, 114 false positives.\n- FedAvg at 100% labels: F1 0.401, 1394 false positives (~12x centralized).\n- The 'degrades less under scarcity' pattern is partly a starting-point artifact.\n- Boundary channel shows no benefit; higher lambda lowers F1.\n\nOriginal H2 criterion (federated vs centralized under scarcity, >=20% fewer FP, multiple seeds, significance, DP bound) is NOT yet tested. Listed as open in the README.\n\n🤖 Generated with [Claude Code](https://claude.com/claude-code)",
+    "createdAt": "2026-10-06T15:01:25Z",
+    "headRefName": "maanas/h2-status-correction",
+    "mergedAt": "2026-10-06T16:32:11Z",
+    "number": 15,
+    "state": "MERGED",
+    "title": "docs(h2): record verified findings and open H2 criteria"
+  },
+  {
+    "author": {
+      "id": "U_kgDOCsvrOA",
+      "is_bot": false,
+      "login": "maanas1234",
+      "name": "Maanas Tyagi "
+    },
+    "body": "Pre-registers SIS parameters (M=576, N=1152, q and beta unchanged) for a 128-bit post-quantum target (quantum core-SVP heuristic ~138 bits), reusing the bounds from PR #12.\n\n**The confirmatory run is halted.** Inspecting the AIR shows it does not bind the commitment: the relation is checked mod p=0x700001, not mod Q=8380417, and the quotient is unconstrained. Any amount satisfies it, so PR #9/#12 overhead numbers come from a circuit that does not enforce what it claims. Those numbers cannot support an H4 verdict.\n\nFixes required before a confirmatory run are listed in section 0 of the doc.\n\n🤖 Generated with [Claude Code](https://claude.com/claude-code)",
+    "createdAt": "2026-10-06T15:12:30Z",
+    "headRefName": "maanas/h4-confirmatory-params",
+    "mergedAt": "2026-10-06T16:32:17Z",
+    "number": 16,
+    "state": "MERGED",
+    "title": "docs(h4): pre-register confirmatory params; halt run on soundness defect"
+  },
+  {
+    "author": {
+      "id": "U_kgDOCsvrOA",
+      "is_bot": false,
+      "login": "maanas1234",
+      "name": "Maanas Tyagi "
+    },
+    "body": "Implements the H2 privacy and baseline pieces that were missing.\n\n- **DP (client-level, opt-in):** clip each institution's update, Gaussian noise, RDP accounting for full participation. Guarantee protects an institution, not an individual transaction. Per-record DP is not claimed.\n- **Centralized under scarcity:** `--scarcity` flag on the centralized baseline, for the comparison the original H2 criterion needs.\n- Default federated behavior is unchanged.\n- Unit tests pass (5/5). **Not yet run on the Elliptic data**, which is not on this machine. Sanity: T=10, z=1, delta=1e-5 gives eps=20.2, so a meaningful privacy level needs a much larger noise multiplier.\n\n🤖 Generated with [Claude Code](https://claude.com/claude-code)",
+    "createdAt": "2026-10-06T16:34:39Z",
+    "headRefName": "maanas/h2-dp-fedavg",
+    "mergedAt": null,
+    "number": 17,
+    "state": "CLOSED",
+    "title": "feat(h2): client-level DP-FedAvg and centralized scarcity option"
+  },
+  {
+    "author": {
+      "id": "U_kgDOB0Ytew",
+      "is_bot": false,
+      "login": "simranpundirr",
+      "name": "Simran Pundir"
+    },
+    "body": "## Summary\r\n\r\nCorrects the H4 PQ-STARK commitment-binding circuit and records the\r\nmatched classical/PQ benchmark after the fix.\r\n\r\n### Validation\r\n\r\n- Commitment-binding negative test: PASS\r\n- Debug test: PASS\r\n- Release test: PASS\r\n- PQ benchmark: 10/10 successful\r\n- Classical benchmark: 10/10 successful\r\n\r\n### Results\r\n\r\n| Metric | Classical | PQ | Overhead |\r\n|---|---:|---:|---:|\r\n| Proof size | 2,233 B | 33,214 B | 14.87× |\r\n| Proving time | 0.3402 ms | 68.7434 ms | 202.05× |\r\n| Verification time | 0.1584 ms | 1.1353 ms | 7.17× |\r\n\r\nPre-registered feasibility bounds:\r\n- Proof size ≤ 20× → PASS\r\n- Verification latency ≤ 10× → PASS\r\n\r\nThe ~202× proving overhead is reported explicitly.\r\n\r\n### Limitations\r\n\r\nThis establishes a feasibility/performance result for the corrected\r\nresearch-candidate prototype on the evaluated 2×2 matrix workload.\r\n\r\nIt does not establish production-grade PQ security, a NIST security\r\nlevel, or end-to-end ZKML performance for the full H1–H3 model classes.\r\nConcrete SIS security analysis and broader model coverage remain future work.",
+    "createdAt": "2026-10-07T00:38:48Z",
+    "headRefName": "simran/h4-production-params",
+    "mergedAt": null,
+    "number": 18,
+    "state": "CLOSED",
+    "title": "Validate H4 PQ-STARK matched benchmark"
+  },
+  {
+    "author": {
+      "id": "U_kgDOEdWoow",
+      "is_bot": false,
+      "login": "indrakshi2006-boop",
+      "name": "Indrakshi"
+    },
+    "body": "",
+    "createdAt": "2026-10-09T20:32:45Z",
+    "headRefName": "h2-federated-aml-ii",
+    "mergedAt": "2026-10-10T18:42:56Z",
+    "number": 19,
+    "state": "MERGED",
+    "title": "Complete H2 multi-seed and privacy experiments"
+  },
+  {
+    "author": {
+      "id": "U_kgDOCsvrOA",
+      "is_bot": false,
+      "login": "maanas1234",
+      "name": "Maanas Tyagi "
+    },
+    "body": "Resolves the pseudo-replication caveat in H3. The action-level z-test (p=3.7e-24) treats 1,000 correlated actions per group as independent.\n\nAgent-level re-analysis of the committed confirmatory run (n=20 agents per group, one rate per agent, one-sided):\n- Mann-Whitney U = 25.5, z = -4.73, p = 1.1e-6\n- Permutation test on mean rate (100k, seed 42): p <= 1e-5\n\nDeterrence holds at the correct unit of analysis. Also fixes a transcription error: control majority bar is 7/20, not 6/20.\n\nFinal H3 verdict: deterrence supported; Sybil resistance fails (documented).\n\nStdlib only, 5 new tests, full H3 suite passes (87).\n\n🤖 Generated with [Claude Code](https://claude.com/claude-code)",
+    "createdAt": "2026-10-10T19:24:21Z",
+    "headRefName": "maanas/h3-agent-level-test",
+    "mergedAt": "2026-10-10T19:24:31Z",
+    "number": 20,
+    "state": "MERGED",
+    "title": "feat(h3): agent-level re-analysis and final verdict"
+  },
+  {
+    "author": {
+      "id": "U_kgDOCsvrOA",
+      "is_bot": false,
+      "login": "maanas1234",
+      "name": "Maanas Tyagi "
+    },
+    "body": "Replaces the unsound v1 H4 circuit and reports final results.\n\n**Why v1 is withdrawn:** prover-controlled SIS matrix and selectors, wrong modulus with a free quotient, no range checks, and ~11-17 bits of STARK security on both classical and PQ sides.\n\n**v2:** SIS opening over the native field (q = p = 7,340,033); B and selectors as verifier-computed periodic columns; boolean amount bits and exactly-ternary r. SIS estimate beyond full-dimension BKZ (>136 bits quantum, heuristic). Identical secure proof options for both circuits (125-128 bits conjectured). Tests evaluate the AIR directly and reject every forgery attempt; end-to-end prove/verify tests pass.\n\nPre-registration amendments (parameters, workloads, analysis script) were committed before any benchmark run; overhead bounds are unchanged from 2026-10-06.\n\n**Results (30 runs, idle machine):**\n| Workload | Size | Prove | Verify | Verdict |\n|---|---|---|---|---|\n| 2x2 matmul (primary) | 9.1x | 71.5x | **14.1x** | FAIL (verify > 10x) |\n| H1 dense 165x32 | 1.9x | 9.9x | 4.4x | PASS |\n\nThe lattice opening adds a roughly fixed verify cost (~18 ms), so overhead is bounded for a realistic ML layer but not for a trivial computation.\n\n🤖 Generated with [Claude Code](https://claude.com/claude-code)",
+    "createdAt": "2026-10-11T05:30:43Z",
+    "headRefName": "maanas/h4-sound-v2",
+    "mergedAt": "2026-10-11T05:30:51Z",
+    "number": 21,
+    "state": "MERGED",
+    "title": "H4 v2: sound SIS-STARK circuit, secure options, final benchmark"
+  },
+  {
+    "author": {
+      "id": "U_kgDOCsvrOA",
+      "is_bot": false,
+      "login": "maanas1234",
+      "name": "Maanas Tyagi "
+    },
+    "body": "Completes H2.\n\n**Protocol** (pre-registered in experiments/PREREGISTRATION_v2.md before any run): 10 seeds, matched 200-epoch budget, validation checkpoint selection for all methods, pooled centralized baseline on the identical scarce label mask, false-positive primary test (one-sided Wilcoxon, Holm), institution-level DP sweep with RDP accounting.\n\n**Why v2:** v1 used 5 seeds (a paired two-sided Wilcoxon cannot reach p<0.05), unequal training budgets, and no centralized comparison under scarcity.\n\n**Results:**\n- Primary FP criterion: met at all 6 levels (45-99.9% fewer FP, Holm p<=0.031).\n- But FedAvg F1 is significantly lower than centralized at every level (-0.07 to -0.19), with much lower recall; PR-AUC significantly lower at 50-100% labels. The FP reduction comes from flagging less, not better detection.\n- Refined H2 (boundary channel): not supported; lowers F1 at 5/6 levels.\n- DP: epsilon ~50 drops F1 0.65 -> 0.29; settings that keep utility have epsilon >= 2e5.\n\nData placed locally from the PyG Elliptic mirror (gitignored, not committed).\n\n🤖 Generated with [Claude Code](https://claude.com/claude-code)",
+    "createdAt": "2026-10-11T05:33:41Z",
+    "headRefName": "maanas/h2-protocol-v2",
+    "mergedAt": "2026-10-11T05:33:48Z",
+    "number": 22,
+    "state": "MERGED",
+    "title": "H2 protocol v2: pre-registered 10-seed study, pooled centralized baseline, DP"
+  },
+  {
+    "author": {
+      "id": "U_kgDOCsvrOA",
+      "is_bot": false,
+      "login": "maanas1234",
+      "name": "Maanas Tyagi "
+    },
+    "body": "Adds a Final Results section to the top-level README with the verdict, key numbers and main caveat for each hypothesis, and fixes the H2 target line (the proposal compares against a centralized baseline, not a single bank).\n\n🤖 Generated with [Claude Code](https://claude.com/claude-code)",
+    "createdAt": "2026-10-11T05:34:32Z",
+    "headRefName": "maanas/final-readme",
+    "mergedAt": "2026-10-11T05:34:35Z",
+    "number": 23,
+    "state": "MERGED",
+    "title": "docs: final results for H1-H4"
+  },
+  {
+    "author": {
+      "id": "U_kgDOCsvrOA",
+      "is_bot": false,
+      "login": "maanas1234",
+      "name": "Maanas Tyagi "
+    },
+    "body": "Replaces the root-Hermite heuristic with a real lattice-estimator run (malb/lattice-estimator 53da598, official SageMath image).\n\n- v2 (n=80, m=512, q=7,340,033, inf-norm <= 2): best attack BKZ-507..511, log2 cost 615 (ChaLoy21 quantum) to 705 (MATZOV).\n- L2 formulation: no feasible attack.\n- Counting argument: ~2^-636 expected short collisions for a random matrix, so binding is statistical.\n- v1 parameters: estimator internal error, recorded as such (v1 already withdrawn).\n\nScript and raw JSON added under h4-pqc-stark/docs/.\n\n🤖 Generated with [Claude Code](https://claude.com/claude-code)",
+    "createdAt": "2026-10-11T05:54:02Z",
+    "headRefName": "maanas/h4-lattice-estimator",
+    "mergedAt": "2026-10-11T05:54:05Z",
+    "number": 24,
+    "state": "MERGED",
+    "title": "docs(h4): lattice-estimator security result for v2 parameters"
+  },
+  {
+    "author": {
+      "id": "U_kgDOCsvrOA",
+      "is_bot": false,
+      "login": "maanas1234",
+      "name": "Maanas Tyagi "
+    },
+    "body": "Moves helpers used only by tests (num_constraints, CONSTRAINTS, BLOCK_CONSTRAINTS) under cfg(test). Release build now has zero warnings; all tests pass. No behavior change.\n\n🤖 Generated with [Claude Code](https://claude.com/claude-code)",
+    "createdAt": "2026-10-11T05:57:05Z",
+    "headRefName": "maanas/h4-clean-warnings",
+    "mergedAt": "2026-10-11T05:57:09Z",
+    "number": 25,
+    "state": "MERGED",
+    "title": "chore(h4): warning-free build"
+  },
+  {
+    "author": {
+      "id": "U_kgDOCsvrOA",
+      "is_bot": false,
+      "login": "maanas1234",
+      "name": "Maanas Tyagi "
+    },
+    "body": "Continues H4 after v2 missed the 2x2 verify bound (14.1x > 10x). v2's verdict is kept as recorded.\n\n**Diagnosis:** instrumented the Winterfell verifier. In v2, DEEP composition over the 80 accumulator columns was ~15 ms of ~19 ms verify.\n\n**v3 (same statement):** identical commitment (same uniform matrix, n=80; a test asserts it). s packed 4 per row; after s is committed, gamma is drawn from F_{p^6} and one auxiliary accumulator checks sum_j gamma^j (A_j s - c_j) = 0. Extra soundness error <= 2^-130.5 (Schwartz-Zippel). Binding unchanged (statistical).\n\n**Process:** v3 design, tests and pre-registration (docs/h4_v3.md, incl. disclosure of the exploratory dev timings) committed before the confirmatory run; bounds and protocol unchanged.\n\n**Confirmatory results (30 runs):**\n| Workload | Size | Prove | Verify | Verdict |\n|---|---|---|---|---|\n| 2x2 matmul | 4.97x | 14.2x | 7.40x | PASS |\n| H1 dense 165x32 | 1.23x | 2.58x | 3.45x | PASS |\n\nTests: 10/10 (v2 and v3), including direct AIR checks with three gamma values and forgery rejection.\n\n🤖 Generated with [Claude Code](https://claude.com/claude-code)",
+    "createdAt": "2026-10-11T06:30:10Z",
+    "headRefName": "maanas/h4-v3-rlc",
+    "mergedAt": "2026-10-11T06:30:14Z",
+    "number": 26,
+    "state": "MERGED",
+    "title": "H4 v3: random-linear-combination proof; passes all bounds"
+  },
+  {
+    "author": {
+      "id": "U_kgDOCsvrOA",
+      "is_bot": false,
+      "login": "maanas1234",
+      "name": "Maanas Tyagi "
+    },
+    "body": "Closes the last open H4 limitation: coverage of the model classes used in H1-H3.\n\n**What is proven (exact integer inference, not timing stand-ins):**\n- H1: the trained W32_B1 model, all layers (projection + ReLU, residual block + ReLU, head), on a real illicit test transaction.\n- H2: the trained centralized GCN (166->64->2) prediction for Elliptic node 36333 over its real 3-node receptive field.\n- H3: choose_action + is_violation for 64 real decisions of the staked treatment run.\n\n**Soundness:** private inputs range-checked; every requantization and ReLU proven with unique decompositions (windows <= 2^22 < p); interval bounds rule out field wrap-around. 16/16 tests, including rejection of wrong outputs, out-of-range inputs that match their claimed output, tampered quotients, forged ReLU outputs and forged violation flags.\n\n**Fidelity (test splits):** H1 F1 0.505 vs float 0.512 (99.5% agreement); H2 F1 0.732 vs 0.743 (99.0%), with a declared 0.1-99.9 percentile feature clip chosen on validation; H3 100% over 1,000 decisions.\n\n**Pre-registered** (docs/h4_coverage.md) before any coverage timing. **Results (30 runs, v3 vs classical):**\n| Workload | Size | Prove | Verify | Verdict |\n|---|---|---|---|---|\n| H1 full MLP | 1.18x | 1.28x | 1.92x | PASS |\n| H2 GCN node | 1.13x | 1.36x | 1.76x | PASS |\n| H3 rule x64 | 1.20x | 1.51x | 1.96x | PASS |\n\nQuantization scripts in h4-pqc-stark/coverage/ (data from the PyG Elliptic mirror, not committed).\n\n🤖 Generated with [Claude Code](https://claude.com/claude-code)",
+    "createdAt": "2026-10-11T07:08:45Z",
+    "headRefName": "maanas/h4-model-coverage",
+    "mergedAt": "2026-10-11T07:08:49Z",
+    "number": 27,
+    "state": "MERGED",
+    "title": "H4: prove full H1 MLP, H2 GCN, and H3 rule inference; overhead within bounds"
+  },
+  {
+    "author": {
+      "id": "U_kgDOCsvrOA",
+      "is_bot": false,
+      "login": "maanas1234",
+      "name": "Maanas Tyagi "
+    },
+    "body": "Adds docs/NEXT_SESSION.md: current verdicts, two proposed paper findings with concrete plans (one composed PQ proof for a full CBDC transaction decision; a calibration-controlled matched-recall test showing FP criteria in federated AML are gameable), a cheap overhead-law analysis, and practical notes. Also updates two H2 README passages that still said there was no privacy accountant (protocol v2 added one) and that the original criterion was untested (it was, in v2).\n\n🤖 Generated with [Claude Code](https://claude.com/claude-code)",
+    "createdAt": "2026-10-11T07:11:32Z",
+    "headRefName": "maanas/handoff-next-session",
+    "mergedAt": "2026-10-11T07:11:36Z",
+    "number": 28,
+    "state": "MERGED",
+    "title": "docs: next-session handoff and stale H2 note fixes"
+  },
+  {
+    "author": {
+      "id": "U_kgDOCsvrOA",
+      "is_bot": false,
+      "login": "maanas1234",
+      "name": "Maanas Tyagi "
+    },
+    "body": "Fits PQ = classical + c over the five measured v3 workloads (2x2, dense, full H1 MLP, H2 GCN, H3 rule).\n\n- Verify +12 ms, prove +28 ms, size +8.4 KB (2x2 excepted: trace padded 8 to 128 rows).\n- Ratio = 1 + c/classical, so PQ binding is cheapest for real-sized models.\n- Labeled post-hoc / descriptive. Script, md, csv and png in `h4-pqc-stark/benchmark_v2`.\n\n🤖 Generated with [Claude Code](https://claude.com/claude-code)",
+    "createdAt": "2026-10-11T07:15:24Z",
+    "headRefName": "maanas/h4-overhead-law",
+    "mergedAt": "2026-10-11T07:15:27Z",
+    "number": 29,
+    "state": "MERGED",
+    "title": "H4: post-hoc overhead law (no new runs)"
+  },
+  {
+    "author": {
+      "id": "U_kgDOCsvrOA",
+      "is_bot": false,
+      "login": "maanas1234",
+      "name": "Maanas Tyagi "
+    },
+    "body": "Pre-registered in experiments/PREREGISTRATION_matched_recall.md (commit 107ace1, before the rerun).\n\n- Rerun of main_scarcity, 10 seeds, per-node scores saved; FPs identical to v2 in 240/240 cases.\n- At matched validation recall, the v2 criterion (>=20% fewer FPs, Holm p<0.05) **fails at all 5 fully evaluable levels** -> Finding B supported.\n- 50-100% labels: FedAvg has 67-80% *more* FPs at equal recall (two-sided Holm p 0.012, 0.049).\n- Exception reported: 10% labels, FedAvg 80% fewer FPs at matched recall, Holm p 0.070 (n.s.).\n- 1% level: only 5/10 seeds evaluable (centralized val recall 0), excluded per pre-registration.\n\n🤖 Generated with [Claude Code](https://claude.com/claude-code)",
+    "createdAt": "2026-10-11T13:24:47Z",
+    "headRefName": "maanas/h2-matched-recall",
+    "mergedAt": "2026-10-11T13:24:51Z",
+    "number": 30,
+    "state": "MERGED",
+    "title": "H2 Finding B: FP criterion is gameable — matched-recall test (pre-registered)"
+  },
+  {
+    "author": {
+      "id": "U_kgDOCsvrOA",
+      "is_bot": false,
+      "login": "maanas1234",
+      "name": "Maanas Tyagi "
+    },
+    "body": "Pre-registered in h4-pqc-stark/docs/h4_composed.md (commit 22909fa, before timing).\n\n- One STARK: full trained H1 inference (private logit) -> risk flag -> H3 decision with risk as violation condition -> rule amount bound to the SIS-committed amount bits.\n- Narrow single-decision rule (register columns + shared 22-bit window) to fit 255 columns; amount link in rlc.rs.\n- 20/20 tests: forged risk flag, wrong outputs, uncommitted amount (classical accepts, PQ rejects), high committed bits, mid-trace register change all rejected.\n- 30 runs: **PASS** — size 1.15x, prove 1.28x, verify 1.77x (bounds 20x/200x/10x). Overhead law predicted 1.14x/1.26x/1.61x.\n\n🤖 Generated with [Claude Code](https://claude.com/claude-code)",
+    "createdAt": "2026-10-11T13:25:22Z",
+    "headRefName": "maanas/h4-composed",
+    "mergedAt": "2026-10-11T13:25:26Z",
+    "number": 31,
+    "state": "MERGED",
+    "title": "H4 Finding A: one PQ proof for a whole transaction decision (H1 -> risk -> H3 -> committed amount)"
+  },
+  {
+    "author": {
+      "id": "U_kgDOCsvrOA",
+      "is_bot": false,
+      "login": "maanas1234",
+      "name": "Maanas Tyagi "
+    },
+    "body": "Docs only. Summarizes PRs #29-#31 in the top-level README and refreshes docs/NEXT_SESSION.md.\n\n🤖 Generated with [Claude Code](https://claude.com/claude-code)",
+    "createdAt": "2026-10-11T13:26:17Z",
+    "headRefName": "maanas/final-findings",
+    "mergedAt": "2026-10-11T13:26:21Z",
+    "number": 32,
+    "state": "MERGED",
+    "title": "README: cross-cutting findings (composed PQ proof, gameable FP criterion, overhead law); handoff refresh"
+  },
+  {
+    "author": {
+      "id": "U_kgDOCsvrOA",
+      "is_bot": false,
+      "login": "maanas1234",
+      "name": "Maanas Tyagi "
+    },
+    "body": "Pre-registered in h3-abt/docs/PREREGISTRATION_durable.md (commit d08e0ff) before running seeds 43-52.\n\n- Wear-out: flat ABT violation rate rises 19% -> 45% (steps 1-10 vs 41-50) as 180/200 agents are slashed to zero; control 50%.\n- T1 stake maintenance < flat (late window): 18.4% vs 45.2%, z=-13.1. Supported.\n- T2 operator-bound escalation < id-keyed escalation with free resets: 2.0% vs 19.6%, z=-18.5. Supported. Free resets (1,757) erase escalation exactly.\n- Bond sweep: analytic break-even B*=14 -> zero resets at B>=14, matches exactly.\n- Tests reproduce the confirmatory seed-42 counts (542/319).\n\n🤖 Generated with [Claude Code](https://claude.com/claude-code)",
+    "createdAt": "2026-10-13T05:38:49Z",
+    "headRefName": "maanas/h3-durable-liability",
+    "mergedAt": "2026-10-13T05:38:54Z",
+    "number": 33,
+    "state": "MERGED",
+    "title": "H3 Finding C: deterrence wears out; stake maintenance + operator-bound history fix it (pre-registered)"
+  },
+  {
+    "author": {
+      "id": "U_kgDOCsvrOA",
+      "is_bot": false,
+      "login": "maanas1234",
+      "name": "Maanas Tyagi "
+    },
+    "body": "Complete write-up of H1-H4 plus findings C1-C5: methods, every result table, verdicts vs pre-registered criteria, limitations, threats to validity, reproducibility index. README results table and handoff updated with H3 Finding C (#33).\n\n🤖 Generated with [Claude Code](https://claude.com/claude-code)",
+    "createdAt": "2026-10-13T05:42:59Z",
+    "headRefName": "maanas/full-report",
+    "mergedAt": "2026-10-13T05:43:03Z",
+    "number": 34,
+    "state": "MERGED",
+    "title": "Full end-to-end results report (docs/FULL_REPORT.md)"
+  },
+  {
+    "author": {
+      "id": "U_kgDOCsvrOA",
+      "is_bot": false,
+      "login": "maanas1234",
+      "name": "Maanas Tyagi "
+    },
+    "body": "118-page exhaustive record. Tables are generated from the committed result files by `docs/exhaustive/build.py` (no retyped numbers); narrative in `docs/exhaustive/sections/`.\n\nCovers every version incl. withdrawn/superseded (H1 v1 recovered from git, H2 v1 single/5-seed, H4 v1 + halted pre-reg + closed PR #18), every per-seed and per-run table, all 34 PRs, corrections log (25 entries), provenance gaps, proposal items not attempted, verbatim configs/pre-registrations/original docs.\n\nAlso: force-adds H3 durable outputs that .gitignore had excluded; fixes composed-proof PQ width 219 -> 220 in FULL_REPORT.\n\n🤖 Generated with [Claude Code](https://claude.com/claude-code)",
+    "createdAt": "2026-10-13T06:21:42Z",
+    "headRefName": "maanas/exhaustive-report",
+    "mergedAt": "2026-10-13T06:21:46Z",
+    "number": 35,
+    "state": "MERGED",
+    "title": "Exhaustive record of every experiment (docs/EXHAUSTIVE_REPORT.md)"
+  },
+  {
+    "author": {
+      "id": "U_kgDOCaI0xQ",
+      "is_bot": false,
+      "login": "amanhooda2005",
+      "name": ""
+    },
+    "body": "## What this adds\n- **Integration (`integration/`)**: 4-validator Hyperledger Besu QBFT chain, validator attestation services (native proof verification, 3-of-4 quorum), SettlementGate contract, H3 LiabilityRegistry on-chain, end-to-end pipeline with fault injection.\n- **H1 v2 / v2.1**: hardened dispute contract (on-chain adjudication, prefix-consistency check, bonds, timeouts, per-challenger disputes); complete on-chain games with real EZKL step verifiers; one shared verifier per step shape (4 instead of 63, 17.2M vs ~251M deploy gas).\n- **H3**: on-chain LiabilityRegistry (9 tests) and a pre-registered learning-agent study under imperfect detection (pre-registration committed before the run).\n- **H4 v4/v4.1**: composed proof re-implemented on Plonky3 with zero-knowledge hiding; end-to-end security estimate (124-bit conjectured / 111-bit proven classical, ~62-bit quantum, conservative).\n- Docs: README \"Integrated system (TRL 4)\" section, FULL_REPORT §6A, integration/README.\n\n## Results\n| Run | Honest settled as required | Faulty reaching quorum / changing ledger |\n|---|---|---|\n| 1,000 real Elliptic test-period tx | 889 / 889 (4/4 signatures) | 0 / 111 · 0 |\n| 300 synthetic, 1 Byzantine validator | 244 / 244 | 0 / 56 · 0 |\n| 60 synthetic, 2 Byzantine | 26 / 26 | 0 / 34 · 0 |\n| 40 synthetic, 1 crashed validator | 25 / 25 | 0 / 15 · 0 |\n\n- End to end 1.98 s per transfer; settle gas 84k–108k.\n- H1 in-proof risk flag on Elliptic: precision 0.53, recall 0.72 (0 recall after time step 43, the known post-shutdown collapse).\n- H1 on-chain disputes: 7/7 scenarios correct on two real Elliptic transactions; dispute 1.58–1.91M gas; 10x target holds below a 0.8% dispute rate.\n- H3 learning study: all 4 primary tests supported (Holm p ≤ 3.2e-7).\n- H4: PQ binding under ZK costs 1.07x size, 1.10x prove.\n\n## Defects found by integration (fixed, with regression tests)\n1. The composed proof became incomplete once the H3 slash escalated (22-bit comparison window; now 30-bit with a stated domain).\n2. The proven rule could never execute a compliant transfer; the gate now slashes only attempted violations.\n\n## Tests\nFoundry: H1 17, H3 9, integration 6 · pytest: H1 66, H3 99 · cargo: H4 17 — all passing.\n",
+    "createdAt": "2026-10-15T10:25:15Z",
+    "headRefName": "aman/trl4-integration",
+    "mergedAt": null,
+    "number": 36,
+    "state": "CLOSED",
+    "title": "TRL 4: integrated CBDC pipeline on Besu QBFT, real EZKL dispute verifiers, ZK composed proof, on-chain H3 registry"
+  },
+  {
+    "author": {
+      "id": "U_kgDOCaI0xQ",
+      "is_bot": false,
+      "login": "amanhooda2005",
+      "name": ""
+    },
+    "body": "## What this adds\n- **Integration (`integration/`)**: 4-validator Hyperledger Besu QBFT chain, validator attestation services (native proof verification, 3-of-4 quorum), SettlementGate contract, H3 LiabilityRegistry on-chain, end-to-end pipeline with fault injection.\n- **H1 v2 / v2.1**: hardened dispute contract (on-chain adjudication, prefix-consistency check, bonds, timeouts, per-challenger disputes); complete on-chain games with real EZKL step verifiers; one shared verifier per step shape (4 instead of 63, 17.2M vs ~251M deploy gas).\n- **H3**: on-chain LiabilityRegistry (9 tests) and a pre-registered learning-agent study under imperfect detection (pre-registration committed before the run).\n- **H4 v4/v4.1**: composed proof re-implemented on Plonky3 with zero-knowledge hiding; end-to-end security estimate (124-bit conjectured / 111-bit proven classical, ~62-bit quantum, conservative).\n- Docs: README \"Integrated system (TRL 4)\" section, FULL_REPORT §6A, integration/README.\n\n## Results\n| Run | Honest settled as required | Faulty reaching quorum / changing ledger |\n|---|---|---|\n| 1,000 real Elliptic test-period tx | 889 / 889 (4/4 signatures) | 0 / 111 · 0 |\n| 300 synthetic, 1 Byzantine validator | 244 / 244 | 0 / 56 · 0 |\n| 60 synthetic, 2 Byzantine | 26 / 26 | 0 / 34 · 0 |\n| 40 synthetic, 1 crashed validator | 25 / 25 | 0 / 15 · 0 |\n\n- End to end 1.98 s per transfer; settle gas 84k–108k.\n- H1 in-proof risk flag on Elliptic: precision 0.53, recall 0.72 (0 recall after time step 43, the known post-shutdown collapse).\n- H1 on-chain disputes: 7/7 scenarios correct on two real Elliptic transactions; dispute 1.58–1.91M gas; 10x target holds below a 0.8% dispute rate.\n- H3 learning study: all 4 primary tests supported (Holm p ≤ 3.2e-7).\n- H4: PQ binding under ZK costs 1.07x size, 1.10x prove.\n\n## Defects found by integration (fixed, with regression tests)\n1. The composed proof became incomplete once the H3 slash escalated (22-bit comparison window; now 30-bit with a stated domain).\n2. The proven rule could never execute a compliant transfer; the gate now slashes only attempted violations.\n\n## Tests\nFoundry: H1 17, H3 9, integration 6 · pytest: H1 66, H3 99 · cargo: H4 17 — all passing.",
+    "createdAt": "2026-10-15T10:52:16Z",
+    "headRefName": "aman/trl4-integration",
+    "mergedAt": "2026-10-15T12:32:15Z",
+    "number": 37,
+    "state": "MERGED",
+    "title": "TRL 4: integrated CBDC pipeline on Besu QBFT, real EZKL dispute verifiers, ZK composed proof, on-chain H3 registry"
+  },
+  {
+    "author": {
+      "id": "U_kgDOCaI0xQ",
+      "is_bot": false,
+      "login": "amanhooda2005",
+      "name": ""
+    },
+    "body": "Adds the audit script, EVIDENCE.md, logs and the exported ledger (missed from #37). Addresses review comments: the shared‑verifier dispute proof is no faster than the whole‑model proof (same‑machine numbers in the H1 README); the dispute record now replays with any Foundry version (tested with 1.5.1 and 1.8.5); Besu versions and node‑key setup for Docker; why EXHAUSTIVE_REPORT changes on rebuild (now reproducible); the weaker quantum estimate of the Plonky3 proof. Adds tooling and a guide for running one validator on an independent machine.",
+    "createdAt": "2026-10-20T16:52:45Z",
+    "headRefName": "aman/trl4-evidence",
+    "mergedAt": "2026-10-20T17:32:56Z",
+    "number": 38,
+    "state": "MERGED",
+    "title": "Evidence, reproducibility fixes and independent-validator setup"
+  },
+  {
+    "author": {
+      "id": "U_kgDOCaI0xQ",
+      "is_bot": false,
+      "login": "amanhooda2005",
+      "name": ""
+    },
+    "body": "Answers the review comment \"All four validator keys are yours.\"\n\nThe run was split across two people and two machines, connected over Tailscale:\n- **Host** (a person outside the team, his own MacBook): the 4-node QBFT network, the contract deployment, three validators and the 200 transfers.\n- **Reviewer** (Aman, his own MacBook Air): a separate Besu node synced from the host's network, and the fourth validator. Its key was generated on that machine and never shared, and it used its own build of the proof verifier.\n\nThe `SettlementGate` was deployed with `--threshold 4`, so neither person could settle anything alone.\n\n### Result: 200 real Elliptic transfers, 34 deliberately falsified\n- The fourth validator signed exactly the 166 honest transfers and refused all 34 falsified ones. Each refusal gave the matching reason:\n\n  | Falsification | Count |\n  |---|---|\n  | wrong model | 10 |\n  | amount swap | 8 |\n  | stale penalty | 6 |\n  | corrupted proof | 6 |\n  | flipped verdict | 4 |\n\n- The ledger holds exactly those 166 settlements, each with 4 signatures. No falsified request reached the quorum.\n- The reviewer's three checks against his own copy of the ledger (`check_my_validator.py`) are all `true`.\n- The host's three validators saw the same 200 request ids and made the same sign/refuse decision on every one.\n- In a first attempt, the fourth validator could not be reached and nothing settled (0 of 200).\n\n### Files\n- `integration/evidence/independent_validator/`:\n  - `reviewer/`: the fourth validator's decisions, its own-ledger check, and the machine and version details;\n  - `host/`: run records and the three host validators' decision logs, for both attempts;\n  - `cross_check.py` → `cross_check.json`: reconciles the two sides (standard library only), result `\"all_ok\": true`;\n  - `README.md`: summary.\n- Linked from `docs/EVIDENCE.md`, `docs/INDEPENDENT_VALIDATOR.md` and `README.md`.\n\nNo private keys are included.\n\n**To check:** `cd integration/evidence/independent_validator && python3 cross_check.py`",
+    "createdAt": "2026-10-20T19:33:26Z",
+    "headRefName": "aman/independent-validator-result",
+    "mergedAt": "2026-10-21T05:00:28Z",
+    "number": 39,
+    "state": "MERGED",
+    "title": "Evidence: independent-validator run on two machines (4-of-4 gate)"
+  },
+  {
+    "author": {
+      "login": "maanas1234"
+    },
+    "body": "",
+    "createdAt": "2026-10-21T05:15:07Z",
+    "headRefName": "maanas/final-docs-update",
+    "mergedAt": "2026-10-21T05:15:13Z",
+    "number": 40,
+    "state": "MERGED",
+    "title": "Docs: update both reports for the integrated system (TRL 4); correct quantum-security wording"
+  },
+  {
+    "author": {
+      "login": "amanhooda2005"
+    },
+    "body": "",
+    "createdAt": "2026-10-26T13:08:15Z",
+    "headRefName": "aman/independent-ledger-export",
+    "mergedAt": "2026-10-26T13:41:27Z",
+    "number": 41,
+    "state": "MERGED",
+    "title": "Evidence: exported ledger of the two-machine run, checked against the host's record"
+  },
+  {
+    "author": {
+      "login": "maanas1234"
+    },
+    "body": "",
+    "createdAt": "2026-10-26T13:43:54Z",
+    "headRefName": "maanas/fix-break-even",
+    "mergedAt": "2026-10-26T13:44:08Z",
+    "number": 42,
+    "state": "MERGED",
+    "title": "docs: fix gas break-even rate, record the exported independent ledger"
+  },
+  {
+    "author": {
+      "login": "amanhooda2005"
+    },
+    "body": "",
+    "createdAt": "2026-10-28T05:57:00Z",
+    "headRefName": "aman/hardware-resources",
+    "mergedAt": "2026-10-28T16:39:25Z",
+    "number": 43,
+    "state": "MERGED",
+    "title": "Hardware integration: memory-budgeted proving, machine resource measurements, TPM-anchored operator identity"
+  }
+]

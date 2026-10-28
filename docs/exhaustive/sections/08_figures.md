@@ -53,3 +53,7 @@ Paths are relative to the repository root. The PDF build embeds each image.
 **Figure 13 — H3 learning agents under imperfect detection (Part 6A):** violation rate over time per regime for detection probability 0.5 and 0.8.
 
 ![H3 learning](../h3-abt/results/learning_figure.png)
+
+**Figure 14 — Memory-budgeted decomposition (Part 6B):** measured peak memory of each plan against the prover node's budget, with the whole model's requirement dashed.
+
+![Memory-budgeted plans](../h1-zkopml-v2/results/memory_plans.png)

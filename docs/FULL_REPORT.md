@@ -1,15 +1,16 @@
 # Verifiable, Accountable and Post-Quantum AI for CBDC Systems — Complete Results
 
 **Project:** CBDC – AI – Blockchain research (proposal: `docs/CBDC_AI_Blockchain_Research_Proposal.pdf`)
-**Repository:** github.com/maanas1234/CBDC (all results on `main`, PRs #1–#39)
+**Repository:** github.com/maanas1234/CBDC (all results on `main`, PRs #1–#43)
 **Team:** Aman (H1), Indrakshi (H2), Anjali (H3), Simran (H4); mentor Maanas Tyagi
-**Status:** all experiments complete. This document collects every result, how it was obtained, what it does and does not show, and where the raw evidence lives. **October 2026 update:** the four mechanisms now run as one integrated system on a Byzantine-fault-tolerant ledger, validated on 1,000 real Elliptic transactions (§6A), and a second run split across two people and two machines in which the fourth validator's key was held by someone other than the host (§6A); sections 2–5 describe the original experiments and §6A lists what changed in each track.
+**Updated:** 28 Oct 2026 (adds the hardware integration, §6B)
+**Status:** all experiments complete. This document collects every result, how it was obtained, what it does and does not show, and where the raw evidence lives. **October 2026 update:** the four mechanisms now run as one integrated system on a Byzantine-fault-tolerant ledger, validated on 1,000 real Elliptic transactions (§6A), and a second run split across two people and two machines in which the fourth validator's key was held by someone other than the host (§6A); sections 2–5 describe the original experiments and §6A lists what changed in each track. **Hardware update (late October 2026):** after a faculty review of the invention disclosure, hardware was made part of the method and measured (§6B): a model decomposition sized to the prover node's memory, a TPM-anchored operator identity, and simulated TEE signing and offline payment devices.
 
 ---
 
 ## Abstract
 
-We test four falsifiable hypotheses about running AI inside a central-bank digital currency (CBDC) stack, and the cross-cutting findings (C1–C6) that emerged from them. All confirmatory runs were pre-registered: parameters, bounds and analysis code were committed before the runs.
+We test four falsifiable hypotheses about running AI inside a central-bank digital currency (CBDC) stack, and the cross-cutting findings (C1–C7) that emerged from them. All confirmatory runs were pre-registered: parameters, bounds and analysis code were committed before the runs.
 
 | Hypothesis | Verdict |
 |---|---|
@@ -21,6 +22,11 @@ We test four falsifiable hypotheses about running AI inside a central-bank digit
 The H4 result also includes **one proof covering H1 risk inference → H3 decision → the post-quantum-committed amount**, at 1.15× / 1.28× / 1.77× overhead.
 
 **Integrated system (October 2026, §6A).** The mechanisms were later run together on a 4-validator Hyperledger Besu (QBFT) ledger: on 1,000 real Elliptic transactions with 111 deliberately falsified, all 889 honest transfers settled and none of the falsified ones did, at about 2 s per transfer. In a second run split across two people and two machines, a validator whose key only the reviewer held signed exactly the 166 honest transfers and refused all 34 falsified ones, under a contract that needs all four signatures. This is a lab-scale (technology readiness level 4) demonstration. Its detection quality is limited by the underlying model (recall 0.72 on the real-data run, and none after time step 43), and the proof's quantum security is about 62–63 bits, not the 2⁶¹⁵ of the commitment alone.
+
+**Hardware integration (late October 2026, §6B).**
+- **Memory-budgeted decomposition:** the prover node now splits the model into dispute steps from its own measured memory. Every step of every plan was proven within node budgets of 128 MB to 1 GB, where the whole model needs 1,243 MB.
+- **TPM-anchored operator identity:** prototyped with software TPMs. The honest flow was accepted and 9 of 9 attacks were refused.
+- **TEE signing and offline payment devices:** simulated. The TEE simulation signed the honest request and refused 5 of 5 falsified ones. The offline simulation settled 4 honest payments, refused the invalid ones offline, and caught a hidden overspend at synchronisation.
 
 ---
 
@@ -44,6 +50,7 @@ The H4 result also includes **one proof covering H1 risk inference → H3 decisi
 4. **C4 — False-positive targets for federated AML are gameable.** A pre-registered matched-recall analysis shows the "≥ 20% fewer false positives" criterion is met only because federated models flag less. At equal recall, federation is never significantly better, and it is significantly worse with ample labels (+67–80% false positives). Such targets must be stated at fixed recall. (§3.3)
 5. **C5 — Optimistic bisection for ZKML.** It isolates a tampered step in ⌈log₂ n⌉ rounds (7/7 scenarios) with zero accuracy cost from bisection itself. The 10× latency gain needs deep models (crossover between 24 and 60 blocks). On-chain, it only pays off if fewer than ≈ 0.8% of inferences are disputed (the earlier first-accounting figure was 1.2%; §2). (§2) With the later shared verifiers, a disputed step is no faster than proving the whole model (§6A).
 6. **C6 — The four mechanisms work together on a BFT ledger, with the gate enforced by validators, not by the operator.** 889 / 889 honest transfers settled and 0 / 111 falsified ones did on 1,000 real transactions; every settled row reproduces exactly from the replayed ledger; a four-of-four run with one validator held by another person gave the same decisions on all 200 requests. Lab-scale, not production. (§6A)
+7. **C7 — Hardware as a step of the method.** The decomposition of the model is computed from the prover node's memory, so disputes can be settled on machines that cannot hold the whole-model proof. The operator identity is a TPM, so escaping a violation history needs new hardware. Prototype and simulations, measured on one machine (§6B).
 
 Negative and boundary results are part of the contribution. In particular:
 - H2's federated detection is worse than centralized.
@@ -489,6 +496,103 @@ sequential operator, and privacy of amounts towards validators.
 - **Not independently verified:** the live runs and all timings (they come from the team's machines), the re-execution of the reviewer's exported ledger in Besu (done by the reviewer; the mentor checked the export by decoding it, see §6A), and the H3 learning study and H4 v4 results beyond their test suites.
 - **Limits:** the reviewer is a team member and the host followed the team's instructions; the run shows the gate needs a key the host does not hold, not an audit by an unrelated third party.
 
+## 6B. Hardware integration (late October 2026)
+
+Code: `h1-zkopml-v2/bench_resources.py`, `h1-zkopml-v2/memory_planner.py`, `h4-pqc-stark/zk_composed/measure_resources.py`, `integration/hw_identity/`, `integration/embodiments/` (PR #43). All runs: one 2-vCPU, 8 GB cloud machine, software TPMs (swtpm). Not yet independently verified.
+
+**Why.** A faculty review of the invention disclosure noted that an Indian examiner would likely object under Section 3(k) of the Patents Act (computer programme *per se*). The 2025 Guidelines for Computer Related Inventions and recent Delhi and Madras High Court decisions ask for a technical effect on the machine, not new hardware. This work makes hardware properties and components steps of the method and measures their effect.
+
+### What each proof costs the machine
+
+| Proof | Circuit rows | Proving key | Peak memory | Prove time |
+|---|---|---|---|---|
+| Whole 60-block model | 2¹⁷ | 554 MB | 1,243 MB | 18.2 s |
+| One block step, weights fixed (own verifier) | 2¹² | 41 MB | 107 MB | 1.4 s |
+| One block step, weights hashed (shared verifier) | 2¹⁶ | 659 MB | 1,373 MB | 16.1 s |
+| Composed post-quantum proof of one transfer (prove / verify) | 256 rows × 270 columns | none (transparent) | 20 MB / 12.5 MB | 0.6 s / 15 ms |
+
+- **Ledger storage:** each ledger node stores a 32-byte hash of the ~170 KB composed proof.
+- **Cache simulation (Valgrind Cachegrind):** 99.9% of the prover's 1.15 billion data accesses hit a simulated 1 MiB cache. No other trace layout was compared, so no causal claim is made.
+
+### Memory-budgeted decomposition
+
+**Method.** The prover node:
+1. reads its memory budget M;
+2. uses a profile of its own machine (peak memory of each candidate step shape);
+3. chooses the smallest projection split k and the largest block group g that fit within 0.9·M.
+
+| Node budget | Plan | Steps | Bisection rounds | Measured peak (other positions) |
+|---|---|---|---|---|
+| 128 MB | k = 2, g = 1 | 63 | 6 | 107 MB |
+| 256 MB | k = 1, g = 4 | 18 | 5 | 190 MB |
+| 512 MB | k = 1, g = 8 | 11 | 4 | 357 MB |
+| 1 GB | k = 1, g = 16 | 7 | 3 | 691 MB |
+| 2 GB | whole model | 1 | 0 | 1,243 MB |
+
+- **Results:** every step of every plan stayed within budget and every proof verified.
+- **Unified verification mode:** the same profile decides whether a model is proven in full for every transfer or posted optimistically with step disputes.
+- **Closest prior art:** DSperse (2025) slices models to lower prover memory, but slice sizes are set by hand.
+
+### TPM-anchored operator identity (prototype)
+
+**Design.**
+- **Identity:** k(O) is the SHA-256 of the operator node's TPM endorsement key, which is certified by the TPM manufacturer.
+- **Enrolment:** checks the certificate chain and the attestation key's TPM attributes. A credential activation proves that key lives in the same TPM.
+- **New agent identities:** each needs a TPM2_NV_Certify attestation of the TPM's monotonic counter, bound to a registry nonce. Otherwise it needs a deposit of at least B*.
+
+**Results** (two software TPMs and `LiabilityRegistry` on anvil):
+- the honest flow was accepted;
+- 9 of 9 attacks were refused (replay, re-binding, tampering, software signature, forged certificate, software key as attestation key, activation by another TPM, the same TPM as a second operator, stale or cloned state);
+- a deleted and re-created counter resumed above its old value;
+- attesting took 47 ms on the TPM and 0.4 ms to verify.
+
+### Verify-then-sign in a trusted execution environment (simulation)
+
+**Design.**
+- **Isolation:** the environment is a separate process with an in-memory key and a private copy of the verifier.
+- **Measurement:** the launcher measures it into a TPM PCR.
+- **Attestation:** a TPM quote naming its key is its remote attestation.
+
+**Results:**
+- the honest request was signed;
+- 5 of 5 falsified requests were refused, each for its reason;
+- a patched verifier that accepts everything was never registered, so its signature did not count;
+- replayed quotes, outside keys and unenrolled TPMs were refused.
+
+**Limit:** no hardware memory isolation, and the launcher, not the CPU, takes the measurement.
+
+### Offline payment devices with a secure element (simulation)
+
+**Design.**
+- **Payer device:** proves offline.
+- **Secure element (a TPM):** supplies the commitment randomness and certifies a monotonic counter bound to commitment, proof, payee, amount and cumulative spending.
+- **Payee devices:** check everything without a network.
+- **On reconnection:** validators settle in counter order.
+
+**Results:**
+- 4 honest payments were accepted and settled (11,000).
+- Refused offline:
+  - replay;
+  - a redirected bundle;
+  - an amount raised in transit;
+  - a sanctioned payee;
+  - expired or altered snapshots;
+  - a forged signature;
+  - a software wallet.
+- A manipulated app hiding earlier spending was accepted offline but refused at synchronisation as an overspend, and the device was flagged.
+- Payer side 0.76 s per payment; payee check 64 ms; bundle 174 KB.
+
+### IDF changes
+- **Size:** the invention disclosure grew from 13 to 22 pages.
+- **Generic framing:** the first claim is about execution gating of AI-driven state transfers on a distributed ledger, with CBDC as one application.
+- **New sections and claims:** sections on node hardware, the offline device and the TEE; claims for the memory-budgeted dispute method, TPM-based admission control and the offline device.
+- **Prior art:** DSperse and zkComposer were added.
+
+**Open:**
+- the TPM identity has not been run on a manufacturer TPM;
+- the TEE and offline device have not been run on real TEE hardware or phones;
+- the IPR cell has not yet advised on prior public disclosure (the repositories are public).
+
 ---
 
 ## 7. Methodology and threats to validity
@@ -516,6 +620,7 @@ sequential operator, and privacy of amounts towards validators.
 - **Single dataset:** all ML results use Elliptic.
 - **Simulation:** H2 institutions are simulated, and the H3 agents are simulated and myopic.
 - **Hardware:** H4 timings come from one machine; the integrated-system timings come from the team's machines and were not independently re-run.
+- **Hardware integration (§6B):** software TPMs stand in for manufacturer TPMs; the TEE and the offline devices are simulations on one machine, not runs on TEE hardware, phones or terminals.
 - **Integration scale and independence:** the integrated runs are lab-scale (one sequential operator, one ledger of four validators). The two-machine run involved a team member and a person following the team's instructions.
 - **Detection quality:** the system enforces what its proven rule says. With the H1 model's recall of 0.72 on real data (0 after time step 43), some illicit transfers still execute.
 - **Synthetic composition:** the composed proof pairs a real H1 transaction with a real H3 decision; Elliptic has no amount field.
@@ -534,6 +639,8 @@ sequential operator, and privacy of amounts towards validators.
 | H3 Sybil probe | `python run_sybil.py` | stdout |
 | H4 v2 / v3 / coverage / composed | `cd benchmark_v2 && cargo test --release && cargo run --release -- 30 [v3\|coverage\|composed] > results/benchmark_<x>.csv && python analyze.py results/benchmark_<x>.csv` | `benchmark_v2/results/` |
 | H4 overhead law | `python benchmark_v2/overhead_law.py` | `results/overhead_law.*` |
+| Hardware: resources, memory plans | `python3 h1-zkopml-v2/bench_resources.py`; `python3 h1-zkopml-v2/memory_planner.py <data>`; `python3 h4-pqc-stark/zk_composed/measure_resources.py` | `h1-zkopml-v2/results/dispute_resources.json`, `memory_plans.json`; `zk_composed/results/resources.json` |
+| Hardware: TPM identity, TEE, offline devices | `python3 integration/hw_identity/run_demo.py`; `python3 integration/embodiments/tee_sim.py`; `python3 integration/embodiments/offline_sim.py` | `results/hw_identity.json`, `tee_sim.json`, `offline_sim.json` |
 | H4 lattice estimate | `docker run --rm -v "$PWD:/work" sagemath/sagemath:latest sage -python /work/est_h4.py` (in `docs/`) | `docs/h4_lattice_estimator.json` |
 
 **Data:** Elliptic, from `https://data.pyg.org/datasets/elliptic/`. It is not committed.

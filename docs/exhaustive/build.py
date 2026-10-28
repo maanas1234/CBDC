@@ -484,7 +484,7 @@ def gen_h4_specs():
 
 def gen_h4_tests():
     out = sh("cargo", "test", "--release", "--", "--list", cwd=ROOT / H4 / "benchmark_v2")
-    names = [l.split(":")[0].replace("tests::", "") for l in out.splitlines() if l.endswith(": test")]
+    names = [l[: -len(": test")].replace("tests::", "") for l in out.splitlines() if l.endswith(": test")]
     return f"{len(names)} tests (`cargo test --release`, all passing at the time of writing):\n\n" + "\n".join(f"- `{n}`" for n in names)
 
 
@@ -622,6 +622,91 @@ def gen_h4_v4():
             f"model digest `{info['model_digest'][:16]}…`.\n\n" + v + "\n\nRatios:\n\n" + r + "\n\nSecurity of the whole proof:\n\n" + s)
 
 
+# ---------------------------------------------------------------- hardware integration (Oct 2026, after the faculty review)
+def sup(k):
+    return "2" + str(k).translate(str.maketrans("0123456789", "⁰¹²³⁴⁵⁶⁷⁸⁹"))
+
+def gen_hw_resources():
+    d = rjson("h1-zkopml-v2/results/dispute_resources.json")
+    label = {"monolithic_60_blocks": "Whole 60-block model", "block_step_fixed": "One block step, weights fixed (own verifier)",
+             "block_step_hashed": "One block step, weights hashed (shared verifier)", "projection_step_fixed": "One projection half, weights fixed",
+             "projection_step_hashed": "One projection half, weights hashed (shared verifier)"}
+    a = table(["Proof", "Circuit rows", "Proving key MB", "SRS MB", "Peak memory MB", "Prove s (this run)", "Proof KB", "Verified"],
+              [(label[k], f"{sup(v['logrows'])} = {v['rows']:,}", f(v["pk_mb"], 1), f(v["srs_mb"], 1), f"{v['peak_rss_mb']:,}", f(v["prove_s"], 2), f(v["proof_kb"], 1), v["verified"])
+               for k, v in d.items() if isinstance(v, dict) and "logrows" in v])
+    z = rjson("h4-pqc-stark/zk_composed/results/resources.json")
+    b = table(["Composed proof (pq_zk)", "Value"], [("Prover peak memory", f"{z['prove']['peak_rss_mb_max']} MB"), ("Verifier peak memory", f"{z['verify']['peak_rss_mb_max']} MB"),
+                                                  ("Verifier binary (stripped)", f"{z['binary_stripped_mb']} MB"), ("Proof", f"{z['proof_bytes']:,} bytes"),
+                                                  ("Statement", f"{z['statement_bytes']} bytes"), ("Runs per measurement", z["prove"]["runs"])])
+    c = rjson("h4-pqc-stark/zk_composed/results/cache_sim.json")
+    cs = table(["Run", "Data accesses", "Misses", "Hit rate"],
+               [(k.replace("_D1_", ", data cache ").replace("KiB", " KiB"), f"{v['data_refs']:,}", f"{v['misses']:,}", f"{v['hit_rate_pct']}%") for k, v in c.items() if isinstance(v, dict)])
+    return (f"{d['machine']}:\n\n" + a + "\n\nComposed post-quantum proof (`zk_composed/results/resources.json`):\n\n" + b +
+            f"\n\nCache simulation ({c['tool']}):\n\n" + cs)
+
+
+def gen_hw_memory():
+    p, pl = rjson("h1-zkopml-v2/results/memory_profile.json"), rjson("h1-zkopml-v2/results/memory_plans.json")
+    rows = [(f"projection in {k} part(s): one part", sup(v['logrows']), f(v["pk_mb"], 1), v["peak_rss_mb"], f(v["prove_s"], 2)) for k, v in p["proj"].items()]
+    rows += [(f"join step after {k} part(s)", sup(v['logrows']), f(v["pk_mb"], 1), v["peak_rss_mb"], f(v["prove_s"], 2)) for k, v in p["join"].items()]
+    rows += [(f"{g} residual block(s) per step", sup(v['logrows']), f(v["pk_mb"], 1), v["peak_rss_mb"], f(v["prove_s"], 2)) for g, v in p["group"].items()]
+    w = p["whole_model"]
+    rows.append(("whole model (60 blocks)", sup(w['logrows']), f(w["pk_mb"], 1), w["peak_rss_mb"], "—"))
+    prof = table(["Step shape", "Circuit rows", "Proving key MB", "Peak memory MB", "Prove s"], rows)
+    pr = []
+    for b, q in pl["plans"].items():
+        if q.get("whole_model_fits"):
+            pr.append((f"{int(b):,} MB", "whole model fits", 1, 0, w["peak_rss_mb"], "—", "—"))
+        else:
+            v = q["validation"]
+            pr.append((f"{int(b):,} MB", f"k = {q['proj_parts']}, g = {q['blocks_per_step']}", q["steps"], q["bisection_rounds"], q["predicted_peak_mb"],
+                       v["measured_peak_mb_other_positions"], "yes" if v["within_budget"] and v["all_proofs_verified"] else "NO"))
+    plans = table(["Node budget", "Plan", "Steps", "Bisection rounds", "Predicted peak MB", "Measured peak MB (other positions)", "Within budget, all verified"], pr)
+    return (f"Hardware profile ({p['machine']}):\n\n" + prof + f"\n\nPlans (margin {int(pl['margin'] * 100)}%):\n\n" + plans)
+
+
+def _scen(d, skip=()):
+    rows = []
+    for k, v in d.items():
+        if k in skip:
+            continue
+        if isinstance(v, dict):
+            res = "accepted" if v.get("ok") or v.get("accepted") else ("refused" if ("ok" in v or "accepted" in v) else "")
+            why = v.get("reason") or ", ".join(f"{a}: {b}" for a, b in v.items() if a not in ("ok", "accepted", "credential_tx", "operator_id", "reason") and not isinstance(b, (dict, list)))
+            why = str(why).replace("|", "/").replace("\n", " ")[:220]
+            rows.append((k.replace("_", " "), f"**{res}**: {why}" if res else why))
+        else:
+            rows.append((k.replace("_", " "), str(v)))
+    return table(["Scenario", "Outcome"], rows)
+
+
+def gen_hw_identity():
+    h = rjson("integration/hw_identity/results/hw_identity.json")
+    t = h["timing_ms"]
+    return (_scen(h["scenarios"]) + f"\n\nAll as expected: **{h['all_as_expected']}**. Median of {t['runs']}: TPM increment + certify {t['tpm_increment_and_certify_median']} ms; "
+            f"registry verification {t['registry_verify_median']} ms. Environment: {h['environment']['tpm']}; tpm2-tools {h['environment']['tpm2_tools']}; {h['environment']['chain']}.")
+
+
+def gen_hw_tee():
+    d = rjson("integration/embodiments/results/tee_sim.json")
+    s = d["scenarios"]
+    dec = table(["Request to the approved environment", "Signed", "Reason", "Signature counts at settlement"],
+                [(k, v["signed"], (v["reason"] or "—").split(": {")[0], v.get("signature_counts_at_settlement", "—")) for k, v in s["approved_enclave_decisions"].items()])
+    rest = {k: v for k, v in s.items() if k not in ("approved_enclave_decisions",)}
+    return (dec + "\n\n" + _scen(rest) + f"\n\nAll as expected: **{d['all_as_expected']}**. TPM quote {d['timing_ms']['tpm_quote']} ms; check and sign {d['timing_ms']['enclave_check_and_sign_median']} ms (median). Limits: {d['limits']}.")
+
+
+def gen_hw_offline():
+    d = rjson("integration/embodiments/results/offline_sim.json")
+    s = d["scenarios"]
+    sync = table(["Payee", "Amount", "Declared total", "Counter", "Settled", "Reason"],
+                 [(x["payee"], f"{x['amount']:,}", f"{x['declared_total']:,}", x["counter"], x["settled"], x["reason"]) for x in s["14_sync"]])
+    m = d["measurements"]
+    meas = table(["Measurement", "Value"], [(k.replace("_", " "), v) for k, v in m.items()])
+    return (_scen({k: v for k, v in s.items() if k not in ("14_sync",)}) + "\n\nSynchronisation (all payees together, settled in secure-element counter order):\n\n" + sync +
+            "\n\n" + meas + f"\n\nAll as expected: **{d['all_as_expected']}**; settled total {d['settled_total']:,}.")
+
+
 GENERATORS = {
     "pr_history": gen_pr_history, "commit_count": gen_commit_count, "artifact_index": gen_artifact_index,
     "h1_seeds": gen_h1_seeds, "h1_quant": gen_h1_quant, "h1_steps": gen_h1_steps, "h1_sweep_committed": gen_h1_sweep_committed,
@@ -642,6 +727,7 @@ GENERATORS = {
     "int_runs": gen_int_runs, "int_elliptic_detail": gen_int_elliptic_detail, "int_audit": gen_int_audit, "ind_validator": gen_ind_validator,
     "h1_v21": gen_h1_v21, "h3_learning": gen_h3_learning, "h4_v4": gen_h4_v4,
     "h4_estimator": gen_h4_estimator, "h4_specs": gen_h4_specs, "h4_tests": gen_h4_tests,
+    "hw_resources": gen_hw_resources, "hw_memory": gen_hw_memory, "hw_identity": gen_hw_identity, "hw_tee": gen_hw_tee, "hw_offline": gen_hw_offline,
 }
 
 

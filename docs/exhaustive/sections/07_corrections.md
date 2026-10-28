@@ -36,12 +36,14 @@
 | 30 | The recorded `anvil_state.json` of the on-chain dispute run could not be loaded by current Foundry builds (written by 1.5.1) | The 116-transaction record was not re-checkable with a current toolchain | `verify_dispute_record.py` gained a replay mode that re-sends the original signed transactions (PR #38); reproduced independently |
 | 31 | The independent-validator run (host outside the team, reviewer a team member) does not export the ledger | The reviewer's own-ledger checks are self-reported | Stated as a limit in Part 6A.6; ledger exported in PR #41 and decoded by the mentor (Besu re-execution by the reviewer only) |
 | 32 | `FULL_REPORT.md`, the H1 README and the exhaustive report quoted a 10× gas break-even dispute rate of 1.2% / 1.6%, from the first (v1) gas accounting. The complete v2 accounting (challenge, opening and adjudication included; real step verifiers) gives 0.79% worst / 0.93% typical, as the invention disclosure form states | Overstated the dispute rate at which the gas target holds | Updated to 0.8% / 0.9%, with the v1 figure kept and labelled |
+| 33 | The exhaustive report listed the 20 H4 `benchmark_v2` Rust tests as "0 tests" (no Rust toolchain at build time), and with a toolchain every name printed as `tests` (cut at the first colon) | The test list was missing | Fixed in `build.py` in the report update of 28 Oct 2026; the 20 names now print in full |
 
 ## 7.2 Provenance gaps that remain
 
 - **H1 single-core raw timings** behind the headline 14.9× are not committed; only the multi-core files are.
 - **H2 data** is not committed (licence and size). Results are reproducible from the PyG mirror.
 - **H1 v1 code and results** exist only in git history (commit `3d6e84c^`).
+- **Hardware integration (Part 6B)** has not been independently re-run. The TPMs are software TPMs, and the TEE and offline devices are simulations on one machine.
 
 ## 7.3 Deviations from pre-registrations
 
